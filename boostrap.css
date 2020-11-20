@@ -1,0 +1,155 @@
+ .container-fluid {
+	  background-color: #FFFFFF;
+	  padding-left: 10px !important;
+ }
+  
+ .navbar {
+	  margin-bottom: 0px !important
+ }
+  
+ .navbar-nav {
+	  float: right;
+ }
+  
+ .navbar-default {
+	  background-color: #FFFFFF !important;
+	  border-color: #E7E7E7 !important;
+ }
+  
+ .navbar-brand {
+	  font-family: "Open Sans";
+	  font-style: normal;
+	  font-weight: 400;
+	  font-size: 25px;
+	  font-weight: bold;
+ }
+  
+ /* menu elements */
+.navbar-default .navbar-nav > .active > a {
+	  background-color: #F5F5F5 !important;	
+	  border-width: 3px;
+	  border-color: #F5F5F5 !important;	
+}
+.navbar-default .navbar-nav > .active > a:focus, 
+.navbar-default .navbar-nav > .active > a:hover {
+	color: #555;
+	background-color: green;
+}
+
+ .standard {
+	  background-color: #F5F5F5 !important;
+	  border-style: none !important;
+ }
+  
+.graphs {
+	  background-color: #FFFFFF !important;
+	  border-style: solid !important;
+ }
+
+.well {
+	  background-color: #F5F5F5 !important;
+	  border-style: none !important;
+  }
+
+.col-sm-8 {
+	width: 100% !important;
+	padding-top: 2% !important;
+	padding-left: 2% !important;
+	padding-right: 2% !important;
+	display: inline-block !important;
+}
+
+.row {
+	margin-left: 0px !important;
+	margin-right: 0px !important;
+}
+
+.col-sm-5 {
+	padding-left: 0px !important;
+	padding-right: 0px !important;
+	width: 90% !important;
+	height: 15% !important;
+	font-size: 70% !important;
+}
+
+.col-sm-4 {
+	padding:0px;
+	width:100% !important;
+
+}
+
+/* valuebox */
+.small-box {
+	margin: 0px !important; 
+	padding-top: 2px !important;
+	padding-left: 2px !important;
+	padding-right: 2px !important;
+	padding-bottom: 0px !important;
+}
+
+.shiny-split-layout {
+	margin: 3px !important;
+	margin-bottom: 0px;
+	overflow: visible !important;
+	width: 98% !important;
+	height: 50% !important;
+}
+
+#KPI1{
+	overflow: hidden !important;
+}
+
+#KPI2{
+	overflow: hidden !important;
+	margin-left: -6% !important;
+}
+
+/* predictions */
+#future {
+	background-color: rgba(250,250,250,0.5);
+}
+
+.small-box > .inner {
+	padding:1px;
+	padding-left:2px;	
+}
+/* icon */
+.fa {
+	font-size: 10px !important;
+}
+
+/* Dropwdowns */
+.selectize-input { 
+	height: 70% !important;
+	font-size: 12px !important; 
+	padding: 5px !important;
+	margin: 1px !important;
+	height: 70% !important;
+	line-height: 70% !important;
+	min-height: 0;
+}
+
+.selectize-dropdown {
+	font-size: 12px !important; 
+}
+
+.selectize-dropdown-content {
+	padding: 1px !important;
+	margin: 1px !important;
+}
+
+/* Paragraphs */
+h5 {
+	font-size:12px;
+	font-weight: bold;
+	margin-bottom: 0.6em ;
+}
+
+h6 {
+	font-size: 10px;
+	font-style: italic;
+	margin-top: 0.6em ;
+	margin-bottom: 0em;
+	padding-bottom: 0em;
+}
+

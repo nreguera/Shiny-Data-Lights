@@ -1,0 +1,12 @@
+name: DataLights
+title: DataLights
+username:
+account: nreguera
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3262737
+bundleId: 3878620
+url: https://nreguera.shinyapps.io/DataLights/
+when: 1605756705.31476
+asMultiple: FALSE
+asStatic: FALSE
