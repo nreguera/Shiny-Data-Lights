@@ -1,0 +1,28 @@
+---
+output: html_document
+---
+
+<center>
+
+<br>
+<br>
+<br>
+<br>
+
+### THE DATA
+
+<br>
+<br>
+
+Currently the tool is using the following sources of data:
+
+<br>
+
+**DMSP and OLS nightlights data**, from the Earth Observation Group, NOAA National Centers for Environmental Information (NCEI), [source](https://www.ngdc.noaa.gov/eog/download.html).
+
+**UCDP Georeferenced Event Dataset**, from the Department of Peace and Conflict Research, Uppsala University, [source](https://ucdp.uu.se/downloads/).
+
+**Geografical administrative areas**, from GADM, [source](https://gadm.org/data.html).
+
+ </center>
+ 

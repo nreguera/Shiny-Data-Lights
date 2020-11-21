@@ -1,34 +1,42 @@
- .container-fluid {
-	  background-color: #FFFFFF;
-	  padding-left: 10px !important;
- }
+/* All */
+.container-fluid {
+	padding: 1px !important;
+}
+
+/* Navigation bar */
+.navbar {
+	background-color: #FFFFFF;
+	margin-bottom: 0px !important
+}
+ 
+.navbar-default {
+	background-color: #FFFFFF !important;
+	border-color: #E7E7E7 !important;
+}
   
- .navbar {
-	  margin-bottom: 0px !important
- }
+.navbar-brand {
+	font-family: "Open Sans";
+	font-style: normal;
+	font-size: 25px;
+	font-weight: bold;
+}
+
+.navbar-header {
+	margin-left: 20px !important;
+}
   
- .navbar-nav {
-	  float: right;
- }
+ /* Navigation bar, menu elements */
+.navbar-nav {
+	background-color: #FFFFFF !important;
+	float: right;
+	padding-right:3%;
+}
   
- .navbar-default {
-	  background-color: #FFFFFF !important;
-	  border-color: #E7E7E7 !important;
- }
-  
- .navbar-brand {
-	  font-family: "Open Sans";
-	  font-style: normal;
-	  font-weight: 400;
-	  font-size: 25px;
-	  font-weight: bold;
- }
-  
- /* menu elements */
 .navbar-default .navbar-nav > .active > a {
-	  background-color: #F5F5F5 !important;	
-	  border-width: 3px;
-	  border-color: #F5F5F5 !important;	
+	background-color: #F5F5F5 !important;	
+	border-width: 3px;
+	border-color: #F5F5F5 !important;
+	border: 2px; 
 }
 .navbar-default .navbar-nav > .active > a:focus, 
 .navbar-default .navbar-nav > .active > a:hover {
@@ -36,86 +44,19 @@
 	background-color: green;
 }
 
- .standard {
-	  background-color: #F5F5F5 !important;
-	  border-style: none !important;
+/* Left panel */
+.parameters {
+	background-color: #F5F5F5 !important;
+	border-style: none !important;
  }
   
-.graphs {
-	  background-color: #FFFFFF !important;
-	  border-style: solid !important;
- }
-
-.well {
-	  background-color: #F5F5F5 !important;
-	  border-style: none !important;
-  }
-
-.col-sm-8 {
-	width: 100% !important;
-	padding-top: 2% !important;
-	padding-left: 2% !important;
-	padding-right: 2% !important;
-	display: inline-block !important;
-}
-
-.row {
-	margin-left: 0px !important;
-	margin-right: 0px !important;
-}
-
-.col-sm-5 {
-	padding-left: 0px !important;
-	padding-right: 0px !important;
-	width: 90% !important;
-	height: 15% !important;
-	font-size: 70% !important;
-}
-
-.col-sm-4 {
-	padding:0px;
-	width:100% !important;
-
-}
-
-/* valuebox */
-.small-box {
-	margin: 0px !important; 
-	padding-top: 2px !important;
-	padding-left: 2px !important;
-	padding-right: 2px !important;
-	padding-bottom: 0px !important;
-}
-
-.shiny-split-layout {
-	margin: 3px !important;
-	margin-bottom: 0px;
-	overflow: visible !important;
-	width: 98% !important;
-	height: 50% !important;
-}
-
-#KPI1{
-	overflow: hidden !important;
-}
-
-#KPI2{
-	overflow: hidden !important;
-	margin-left: -6% !important;
-}
-
-/* predictions */
-#future {
-	background-color: rgba(250,250,250,0.5);
-}
-
-.small-box > .inner {
-	padding:1px;
-	padding-left:2px;	
-}
-/* icon */
-.fa {
-	font-size: 10px !important;
+.messages {
+	background-color: #F2F2F2 !important;
+	font-size: 70%;
+	color: grey;
+	font-style: italic;
+	text-align: center;
+	padding: 0.8%;
 }
 
 /* Dropwdowns */
@@ -137,6 +78,66 @@
 	padding: 1px !important;
 	margin: 1px !important;
 }
+
+/* Explorations panel */
+.graphs {
+	background-color: #FFFFFF !important;
+	border-style: solid !important;
+ }
+
+.well {
+	background-color: #F5F5F5 !important;
+	border-style: none !important;
+  }
+
+/* valuebox */
+.small-box {
+	padding-top: 1% !important;
+	padding-bottom: 0% !important;
+}
+
+.small-box > .inner {
+	padding: 0%;
+}
+
+.shiny-split-layout {
+	margin-top: 1% !important;
+	margin-bottom: 0%;
+	overflow: visible !important;
+	width: 90% !important;
+}
+
+.row {
+	margin-left: 0% !important;
+	margin-right: 0% !important;
+	margin-bottom: -5% !important;
+	text-align: -webkit-center;
+}
+
+.col-sm-4 {
+	padding:0%;
+	width:100% !important;
+
+}
+
+#KPI1{
+	overflow: hidden !important;
+}
+
+#KPI2{
+	overflow: hidden !important;
+}
+
+/* predictions */
+#future {
+	background-color: rgba(250,250,250,0.5);
+}
+
+/* icons */
+.fa {
+	font-size: 75% !important;
+}
+
 
 /* Paragraphs */
 h5 {

@@ -1,0 +1,25 @@
+---
+output: html_document
+keep_md: TRUE
+---
+
+<center>
+
+<br>
+<br>
+<br>
+<br>
+
+### THE PROJECT
+
+<br>
+<br>
+
+The objective of this project is to use open data to provide tools that help tackling social issues, exploring and estimating information using night lights data as a predictor of future changes.
+
+<br>
+
+*Last update: 11th November, 2020*
+
+
+ </center>
