@@ -148,9 +148,9 @@ ui <- shinyUI(fluidPage(
           )
         ),
         
-        # graphic
-        h5("Events related to the conflict", style = "text-align: center;"),
-        plotOutput("line_plot", width = "97%", height = "65%")
+        # plot
+        h5("Events and deaths over the population", style = "text-align: center;"),
+        plotOutput("explore_plot", width = "97%", height = "65%")
       
       ), # absolute panel - Explorations
              
@@ -159,27 +159,47 @@ ui <- shinyUI(fluidPage(
        
         id = "future", class = "panel panel-default",
         fixed = TRUE, draggable = FALSE, 
-        top = "auto", right = "1%", bottom = "2%",
+        top = "auto", right = "1%", bottom = "1.8%",
         width = "26%", height = "38%",
         
-        h5("No predictions available for the selected data", 
-                                              style = "text-align: center; 
-                                              color: light-grey;
-                                              padding-top: 100px;")
+        # plot
+        h5("Past and future changes in Nightlights", style = "text-align: center; padding-top: 5px;")
        
       ), # absolute panel - Predictions
            
     ), # tabPanel - App
 
     tabPanel("Project",
-      includeMarkdown("Project.Rmd"),
-      br()
+             
+      # Text
+      absolutePanel(
+       
+       id = "project", class = "panel panel-default", 
+       fixed = TRUE, draggable = FALSE, 
+       top = 75, left = "22%", bottom = "auto",
+       width = "50%", height = "85%",
+       
+       includeMarkdown("Project.Rmd"),
+       br()
+       
+      ), # absolute panel - Text
 
     ), # tabPanel - Project
 
     tabPanel("Data",
-      includeMarkdown("Data.Rmd"),
-      br()
+             
+      # Text
+      absolutePanel(
+       
+       id = "data", class = "panel panel-default", 
+       fixed = TRUE, draggable = FALSE, 
+       top = 75, left = "22%", bottom = "auto",
+       width = "50%", height = "85%",
+       
+       includeMarkdown("Data.Rmd"),
+       br()
+       
+      ), # absolute panel - Text
 
     ) # tabPanel - Data
 

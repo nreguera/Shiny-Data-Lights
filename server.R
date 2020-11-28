@@ -20,44 +20,31 @@
 
 server <- function(input, output, session){
     
-    # Set UI choices and selections --------------------------------------------
+    ### Set UI choices and selections ------------------------------------------
     
     
-    # Data Manipulations -------------------------------------------------------
+    ### Data Manipulations -----------------------------------------------------
     
     # update the data for the plot
     load_cn_data <- reactive({
         x <- cn_data
     })
     
-    # Map Output ---------------------------------------------------------------
+    ### Map Output -------------------------------------------------------------
     
-    # draw the map with the preset parameters
+    # draw the map with the selected parameters
     output$map <- renderTmap(
-        draw_base_map()
+        draw_NLchanges_map("map", input$region)
     )
 
-    # update current map when region changes
-    output$map <- renderTmap(
-        update_region_map("map", input$region)
-    )
-    
-    # Explore Output -----------------------------------------------------------
+    observe({
+        region <- input$region
+        #addLayer_map("map", "eventsLocation_layer", region, session)
 
-    # update the data for the plot
-    my_line_plot <- reactive({
-        ggplot(data=load_cn_data(), aes(x=as.numeric(year), y=deaths_total, group=1)) +
-            geom_line() +
-            geom_point() +
-            theme(axis.title.x = element_blank(),
-                  axis.title.y = element_blank())
     })
     
-    # Plot
-    output$line_plot <- renderPlot({
-        my_line_plot()
-    })
-    
+    ### Explore Output ---------------------------------------------------------
+
     # KPI-1
     output$KPI1 <- renderValueBox({
         valueBox(tags$p("90", style = "font-size: 50%;"), 
@@ -75,12 +62,26 @@ server <- function(input, output, session){
                  color="aqua")
     })
     
-    # Predict Output -----------------------------------------------------------
+    # Explore plot
+    explore_plot <- reactive({
+        ggplot(data=load_cn_data(), aes(x=as.numeric(year), y=deaths_total, group=1)) +
+            geom_line() +
+            geom_point() +
+            theme(axis.title.x = element_blank(),
+                  axis.title.y = element_blank())
+    })
+    
+    # Plot
+    output$explore_plot <- renderPlot({
+        explore_plot()
+    })
+
+    ### Predict Output ---------------------------------------------------------
     
     
-    # Township Click Event -----------------------------------------------------
+    ### Township Click Event ---------------------------------------------------
 
         
-    # Notifications ------------------------------------------------------------
+    ### Notifications ----------------------------------------------------------
     
 }

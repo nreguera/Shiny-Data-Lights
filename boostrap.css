@@ -32,15 +32,10 @@
 }
   
 .navbar-default .navbar-nav > .active > a {
-	background-color: #F5F5F5 !important;	
-	border-width: 3px;
-	border-color: #F5F5F5 !important;
-	border: 2px; 
-}
-.navbar-default .navbar-nav > .active > a:focus, 
-.navbar-default .navbar-nav > .active > a:hover {
-	color: #555;
-	background-color: green;
+	font-weight: bold;
+	background-color: #FFFFFF !important;
+	margin-bottom: -3%;
+	border-bottom: 3px solid black;
 }
 
 /* Left panel */
@@ -48,6 +43,11 @@
 	background-color: #F5F5F5 !important;
 	border-style: none !important;
  }
+ 
+ /* separator */
+ hr {
+  border-top: 2px solid #FFFFFF;
+}
   
 .messages {
 	background-color: #F2F2F2 !important;
@@ -94,10 +94,13 @@
 .small-box {
 	padding-top: 1% !important;
 	padding-bottom: 0% !important;
-}
+	}
 
 .small-box > .inner {
-	padding: 0%;
+	padding: 2% !important;
+	padding-left: 2% !important;
+	margin-left: 1% !important;
+	text-align: -webkit-left;
 }
 
 .shiny-split-layout {
@@ -120,6 +123,12 @@
 
 }
 
+#past{
+	padding-top: 0.5% !important;
+	padding-left: 0.5% !important;
+	padding-right: 0.5% !important;
+}
+
 #KPI1{
 	overflow: hidden !important;
 }
@@ -135,7 +144,7 @@
 
 /* icons */
 .fa {
-	font-size: 75% !important;
+	font-size: 53% !important;
 }
 
 

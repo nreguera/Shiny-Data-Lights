@@ -1,0 +1,863 @@
+
+```{r SET1, eval=TRUE, include=FALSE}
+# General setup parameters
+
+# SET: Settings
+# LDA: Load Data
+# CLN: Clean Data
+# PRP: Process Data
+# EDA: Explore Data
+
+myPaths <- .libPaths() # get the current library paths
+myPaths <- c("E:/R/Libraries/4.0.2", myPaths[1])  # add the new path
+.libPaths(myPaths)  # reassign them
+.libPaths() # check the libraries paths
+
+# General chunk parameters
+knitr::opts_chunk$set(message = FALSE, 
+                      warning = FALSE, 
+                      eval = TRUE, 
+                      include = FALSE, 
+                      echo = FALSE,
+                      cache = FALSE)
+
+# Directories
+dr_cache = "Cache/"
+dr_outputs = "Outputs/"
+dr_data = "Data/"
+
+# Clear console
+cat("\014")
+
+```
+
+
+```{r SET2}
+# Load libraries
+
+# Load data
+library(readxl)
+#library(Rnightlights)
+
+# Clean data
+
+# Process data
+library(sp)
+library(tidyverse)
+library(factoextra)
+library(lubridate)
+library(reshape)
+library(rgdal)
+require(rgeos)
+library(data.table)
+
+# Explore data
+library(ggplot2)
+library(tmap)
+library(highcharter)
+library(leaflet)
+
+# Clear console
+cat("\014")
+
+```
+
+
+```{r SET3, eval=FALSE}
+# Setup specific libraries parameters
+
+# Regional setup
+Sys.setlocale("LC_TIME", "English")
+Sys.setlocale(locale="UTF-8")
+
+# Setup to improve performance downloading data for Rnightlights
+pkgOptions(downloadMethod="aria, extractMethod="rast", numCores=4, deleteTiles=TRUE)
+
+```
+
+
+```{r PRP3}
+# Define a function to extract the month
+
+expand_dates <- function(start, end) {
+
+    # the number of entries we want to add
+  to_add <- month(end) - month(start) 
+
+  # Take the start date, roll it forwards until the month is equal to the end month
+  start_dates <- start + months(0:to_add)
+
+  # everything but the first start_date is rolled back to first of month
+  start_dates <- c(start_dates[1],
+                   rollback(start_dates[-1], roll_to_first = T))
+
+  # end dates are just the start_dates rolled forwards to the end of the month
+  # apply to all but last, thats the end date
+  end_dates <- c(rollback(ceiling_date(start_dates[-length(start_dates)], unit = "months")), end)
+
+  data.frame(start_dates = start_dates,
+             end_dates = end_dates)
+}
+
+```
+
+
+```{r LDA1, eval=FALSE}
+# Download Nightlights data by country
+
+# (ISO3) country code
+ctry <- "MMR"
+
+# Download rasters (images) and radiance readings (csv)
+nl_source <- getCtryNlData(ctryCode = ctry, # country selected
+                    admLevel = "admin3", # lowest level of detail
+                    nlType = "VIIRS.M", # monthly values
+                    nlPeriods = nlRange("201204", "201212"),
+                    ignoreMissing = FALSE, # not ignoring missing values
+                    nlStats = list("mean", na.rm=FALSE)) # aggregation: average
+
+```
+
+
+```{r LDA2}
+# Load nightlights data
+
+nl_file <- paste(dr_data, "nl/NL_DATA_MMR_ADM3_GADM-3.6-SHPZIP.csv", sep="", collapse=NULL)
+
+nl <- read.csv(file=nl_file,
+               header=TRUE, 
+               sep=",",
+               stringsAsFactors = FALSE)
+
+```
+
+
+```{r CLN1}
+# Clean Nightlights dataset
+
+nl_data <- as.data.frame(nl)
+
+# Change the names of the nightlights dataset columns
+names(nl_data) [names(nl_data) == "country"] <- "country"
+names(nl_data) [names(nl_data) == "division_.yin."] <- "state"
+names(nl_data) [names(nl_data) == "district_.kayaing."] <- "district"
+names(nl_data) [names(nl_data) == "village.township"] <- "township"
+
+# No NAs
+
+```
+
+
+```{r PRP1}
+# Melt Nightlights dataset by state and township
+
+# From the identifiers columns, we only keep the township
+nl_data <- nl_data[,-c(1,3,5)]
+
+# Convert the variable in a dataframe
+nl_data <- as.data.frame(nl_data, stringsAsFactors = FALSE)
+
+# Melt the dataset in a more appropriate format for analysis (short)
+nl_data <- melt(nl_data, id=c("state","township"))
+
+# Convert period (in the column named "variable") in date format
+nl_data$variable = gsub("[^[:digit:]]", "", nl_data$variable)
+nl_data$variable = sub("(.{4})(.*)", "\\1/\\2", nl_data$variable)
+nl_data$variable = paste(nl_data$variable, "/01", sep = "")
+nl_data$variable = as.Date(nl_data$variable)
+
+# Assign more identificable names to the columns
+colnames(nl_data) <- c("state", "township", "date", "radiance")
+
+```
+
+
+```{r LDA3}
+# Load conflict data
+
+# Each row in the dataset represents an event linked to a conflict
+# Each conflict can have several events
+# Each event can last several months
+# Deaths are set by event
+
+cn_file <- paste(dr_data, "conflicts/ged201.xlsx", sep="", collapse=NULL)
+
+# Select columns
+cn_col_types <- c("text", # id
+                  "skip", # relid
+                  "numeric", # year
+                  "numeric", # active_year
+                  "skip", # code_status
+                  "numeric", # type_of_violence
+                  "skip", # conflict_dset_id
+                  "numeric", # conflict_new_id
+                  "text", # conflict_name
+                  "skip", # dyad_dset_id
+                  "numeric", # dyad_new_id
+                  "text", # dyad_name
+                  "skip", # side_a_dset_id
+                  "numeric", # side_a_new_id
+                  "text", # side_a
+                  "skip", # side_b_dset_id
+                  "numeric", # side_b_new_id
+                  "text", # side_b
+                  "numeric", # number_of_sources
+                  "skip", # source_article
+                  "skip", # source_office
+                  "skip", # source_date
+                  "skip", # source_headline
+                  "skip", # source_original
+                  "numeric", # where_prec
+                  "text", # where_coordinates
+                  "skip", # where_description
+                  "skip", # adm_1
+                  "skip", # adm_2
+                  "numeric", # latitude
+                  "numeric", # longitude
+                  "skip", # geom_wkt
+                  "skip", # priogrid_gid
+                  "text", # country
+                  "numeric", # country_id
+                  "skip", # region
+                  "numeric", # event_clarity
+                  "numeric", # date_prec
+                  "date", # date_start
+                  "date", # date_end
+                  "numeric", # deaths_a
+                  "numeric", # deaths_b
+                  "numeric", # deaths_civilians
+                  "numeric", # deaths_unknown
+                  "numeric", # best
+                  "numeric", # high
+                  "numeric", # low
+                  "skip", # gwnoa
+                  "skip") # gwnob
+
+cn <- read_xlsx(path=cn_file,
+               col_names=TRUE,
+               col_types=cn_col_types,
+               skip=0)
+
+```
+
+
+```{r CLN2}
+# select Myanmar events and clean dataset
+
+# Select events by country
+cn_events <- as.data.frame(cn[which(cn$country_id==775), ])
+cn_events = select(cn_events, -country, -country_id)
+
+# convert to date
+cn_events$date_start <- as.Date(cn_events$date_start)
+cn_events$date_end <- as.Date(cn_events$date_end)
+
+# convert to boolean
+cn_events$active_year <- as.logical(cn_events$active_year)
+
+# convert to factor
+cn_events$date_prec <- as.factor(cn_events$date_prec)
+cn_events$where_prec <- as.factor(cn_events$where_prec)
+cn_events$event_clarity <- as.factor(as.numeric(cn_events$event_clarity))
+
+# Rename event_clarity to a more meaningful ones
+#cn_events$event_clarity[cn_events$event_clarity == 1] <- "High"
+#cn_events$event_clarity[cn_events$event_clarity == 2] <- "Low"
+
+# change names
+names(cn_events) <- c("id","year","active_year",
+                    "type_of_violence","conflict_id","conflict_name","dyad_id","dyad_name",
+                    "side_a_id","side_a_name","side_b_id","side_b_name",
+                    "sources_number",
+                    "location_prec","location_name","latitude","longitude",
+                    "event_prec","date_prec","date_start","date_end",
+                    "deaths_side_a","deaths_side_b","deaths_civilians",
+                    "deaths_unknown","deaths_total","deaths_high","deaths_low")
+
+
+```
+
+
+```{r EDA1}
+# Exploring conflicts dataset
+
+# Explore deaths
+cn_explore = cn_events[c("date_start", "deaths_side_a", "deaths_side_b", "deaths_civilians", "deaths_unknown", "deaths_total","deaths_high", "deaths_low")]
+cn_explore = melt(cn_explore, "date_start")
+
+# boxplot
+plot1 <-ggplot(cn_explore, aes(x=variable, y=value)) +
+  geom_boxplot(outlier.colour="black", outlier.shape=16,
+             outlier.size=2, notch=FALSE)
+
+# scatterplot
+plot1 <- ggplot(cn_explore) +
+  geom_point(aes(x=date_start, y=value, color=variable), alpha = 0.4) + 
+  facet_wrap( ~ variable, ncol=3)
+
+# events by year
+cn_explore = cn_events[c("year", "event_prec")]
+
+ggplot(cn_explore, aes(x=year, fill=event_prec)) +
+  geom_histogram(colour='white', size=1)
+
+```
+
+
+```{r LDA3}
+# Load geographical data
+
+# Country level
+mm_file <- paste(dr_data, "geo/gadm36_MMR_0_sp.rds", sep="")
+co_geo <- readRDS(mm_file)
+
+# State level
+mm_file <- paste(dr_data, "geo/gadm36_MMR_1_sp.rds", sep="")
+st_geo <- readRDS(mm_file)
+
+st_geo <- readRDS("E:/Data Lights/Shiny/gadm36_MMR_1_sp.rds")
+
+# District level
+mm_file <- paste(dr_data, "geo/gadm36_MMR_2_sp.rds", sep="")
+ds_geo <- readRDS(mm_file)
+
+# Township level
+mm_file <- paste(dr_data, "geo/gadm36_MMR_3_sp.rds", sep="")
+tw_geo <- readRDS(mm_file)
+
+
+```
+
+
+```{r PRP4}
+# Create variables for the geographical data
+
+#create a list of regions and states
+st_list = as.list(st_geo@data$NAME_1)
+
+```
+
+
+```{r EDA2}
+# Exploring geographic dataset
+
+# plot maps and coordinates
+par(mar = c(0, 0, 0, 0)) # Set the margin on all sides to 0
+
+{plot(st_geo, col = 'lightgrey', border = 'darkgrey')
+points(cn_events$longitude, cn_events$latitude, col="red", cex=1)}
+
+# plot nightlights
+nl_explore = tw_geo
+nl_explore@data$radiance = nl_data[which(nl_data$date=="2012-04-01"), ]$radiance
+
+tm_shape(co_geo) +
+    tm_borders(col = "black", lwd = 1) +
+tm_shape(nl_explore) + 
+  tm_fill(col = "radiance", 
+          n = 10,
+          palette = "cividis", 
+          contrast = c(0,1))+
+tm_shape(st_geo) +
+    tm_borders(col = "light grey", lwd = 1, lty = "dashed", alpha = 0.6) +
+tm_legend(show=FALSE) + 
+tm_layout(frame = FALSE)
+
+
+```
+
+
+```{r PRP1}
+# Remove points that lay of the polygons (outsiders) in the conflicts dataset
+
+# create events spatialpolygon with geographical points 
+cn_temp <- data.frame(cn_events$longitude,cn_events$latitude)
+coordinates(cn_temp) <- ~cn_events.longitude+cn_events.latitude
+proj4string(cn_temp) <- proj4string(tw_geo)
+
+# get the numeric index row of outsiders 
+outsiders = over(cn_temp, tw_geo)
+outsiders = rownames(outsiders[is.na(outsiders$GID_0),])
+outsiders = as.numeric(outsiders)
+
+# remove the outsiders from the conflict dataset
+cn_events = cn_events %>% 
+      filter(!row_number() %in% outsiders)
+
+# remove the outsiders from the cn_events dataset (creating it again)
+cn_temp <- data.frame(cn_events$longitude,cn_events$latitude)
+coordinates(cn_temp) <- ~cn_events.longitude+cn_events.latitude
+proj4string(cn_temp) <- proj4string(tw_geo)
+
+# plot the map and coordinates
+{plot(st_geo, col = 'lightgrey', border = 'darkgrey')
+points(cn_events$longitude, cn_events$latitude, col="red", cex=1)}
+
+# improvement: we may want to include the points that are in the border of the administrative divisions
+
+```
+
+
+```{r PRP2}
+# Attach the administrative divisions names to the events dataframe
+
+cn_temp$NAME_1 = over(cn_temp, tw_geo)$NAME_1
+cn_temp$NAME_2 = over(cn_temp, tw_geo)$NAME_2
+cn_temp$NAME_3 = over(cn_temp, tw_geo)$NAME_3
+
+# An alternative for the intersection
+#gIntersection(cn_temp, tw_geo)
+
+# convert spatialpointsdataframe to dataframe
+cn_temp <-  as.data.frame(cn_temp)
+names(cn_temp) <- c("NAME_1","NAME_2","NAME_3","longitude","latitude")
+
+# bind the administrative divisions name to the conflicts dataset
+NAME_1 <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
+                              cn_events$latitude == cn_temp$latitude, 
+                                cn_temp$NAME_1 , ""))
+
+NAME_2 <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
+                              cn_events$latitude == cn_temp$latitude, 
+                                cn_temp$NAME_2 , ""))
+
+NAME_3 <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
+                              cn_events$latitude == cn_temp$latitude, 
+                                cn_temp$NAME_3 , ""))
+
+# Attach the administrative name to the conflicts data
+cn_events <- cbind(cn_events, NAME_1)
+cn_events <- cbind(cn_events, NAME_2)
+cn_events <- cbind(cn_events, NAME_3)
+
+# plot those that fall in a specific state
+filter <- cn_events[ which(cn_events$NAME_1=="Kachin"), ]
+{plot(st_geo, col = 'lightgrey', border = 'darkgrey')
+points(filter$longitude, filter$latitude, col="red", cex=1)}
+
+
+```
+
+
+```{r EDA}
+# Explore conflicts dataset
+
+# events by type and state
+cn_explore = cn_events[c("year", "type_of_violence", "NAME_1")]
+cn_explore = cn_explore %>% count(type_of_violence, NAME_1)
+
+ggplot(cn_explore) +
+  geom_point(aes(x=n, y=NAME_1, color=type_of_violence), alpha = 0.4)
+
+ggplot(cn_explore, aes(x=n, fill=type_of_violence, color=type_of_violence)) +
+  geom_histogram(position="dodge")
+
+
+```
+
+
+```{r PRP3}
+# Classify events by the impacts in deaths from the conflict dataset: choose number of clusters
+
+# Impact of event is measured by these 2 variables: number of civilians deaths, and number of total deaths
+cn_stand <- cn_events %>% select(24,26)
+
+# Standardize the data to make variables comparable 
+# (no need as they are already comparable, i.e., they are both deaths)
+cn_stand <- scale(cn_stand)
+
+#set.seed(123)
+
+# Determining the clusters using the Elbow method
+#fviz_nbclust(cn_stand, kmeans, method = "wss") +
+#   geom_vline(xintercept = 4, linetype = 2) +
+#  labs(subtitle = "Elbow method")
+
+# Determining the clusters using the Silhouette method
+#fviz_nbclust(cn_stand, kmeans, method = "silhouette")+
+#  labs(subtitle = "Silhouette method")
+
+# Determining the clusters using the GAP statistic method
+#fviz_nbclust(cn_stand, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+#  labs(subtitle = "Gap statistic method")
+
+# Elbow = 4
+# Silhouette = 2,4
+# GAP = 1,5
+# According to these observations, it's possible to define the number of clusters in 4
+
+```
+
+
+```{r PRP4}
+# Classify events by the impacts in deaths from the conflict dataset
+
+# this number is selected based on the previous results
+cn_clusters = 4
+
+# Calculate and assign the clusters to the cn_events dataset (check the size and centers of kmeans output)
+cn_events$impact <- kmeans(cn_stand, cn_clusters, nstart=100)$cluster
+
+# Ordered factor, and rename impact levels to a more meaningful ones
+cn_events$impact_level = factor(cn_events$impact,labels = c("Low","Medium","High","Extreme"), ordered = TRUE)
+
+```
+
+
+```{r PRP2}
+# Create a dataframe with information at conflicts level
+
+# Get unique conflicts by region
+cn_conflicts <- unique(cn_events[c("conflict_id","conflict_name","NAME_1")])
+cn_conflicts_list <- unique(cn_events[c("conflict_id","conflict_name")])
+
+# Calculating the first and last date by conflict_id
+for (i in 1:nrow(cn_conflicts_list)) {
+
+  # Select events by conflict id 
+  selected = cn_events %>% filter(conflict_id == cn_conflicts_list[i, 1])
+  
+  # Calculate the length
+  start = min(selected$date_start)
+  end = max(selected$date_start)
+  length = as.numeric(difftime(end, start, units="days"))
+  
+  # assign the start, end and length to each conflict-region row
+  for (j in 1:nrow(cn_conflicts)) {
+
+    # assign the data to the conflicts
+    if (cn_conflicts[j,1] == cn_conflicts_list[i,1]) {
+      cn_conflicts[j,"start"] = start
+      cn_conflicts[j,"end"] = end
+      cn_conflicts[j,"length"] = length
+    }
+    
+  }
+
+}
+
+```
+
+
+```{r PRP2}
+# Create a dataset with monthly deaths by region from the conflict dataset
+
+# Split the months from the conflicts dataset (in the new columns start_dates and end_dates)
+cn_events_monthly <- cn_events %>%
+  mutate(test = map2(date_start, date_end, expand_dates)) %>%
+  unnest(cols = c(test))
+
+# Add a column with the month
+cn_events_monthly$month = month(cn_events_monthly$start_dates)
+
+# Finding intermediate events by month, showing number, deaths, accumulated deaths, duration, and accumulated duration
+
+# create a dataframe with the months that there are events
+cn = as.data.frame(setDT(cn_conflict)[, .(date = seq(cn_start, cn_end, by = "month")), by = conflict_id])
+
+# fill up the dataframe with the months without events
+complete(cn, conflict_id, date)
+
+# initialize variables 
+cn$events = 0 # number of events active in the month
+cn$events_accumulated = 0 # number of events accumulated
+cn$deaths_event = 0 # deaths accumulated at the end of the event
+cn$deaths_accumulated = 0 # deaths accumulated having into account all the events before the date 
+cn$radiance
+cn$population
+cn$events_population
+cn$deaths_population
+
+# two strings of data: 
+# months when there is an event active
+# deaths at the end of the event
+
+# attach deaths and accumulated deaths
+# we assign the deaths to the year/month when the event ended (date_end)
+d_acum <- 0
+e_acum <- 0
+
+for (i in 1:nrow(cn_conflict)) {
+  
+  # get the date of the month in the conflict
+  s_month = month(cn_conflict[i, date_end])
+  s_year = cn_conflict[i, year]
+  s_date = as.Date(paste(s_year, "-", s_month, "-01", sep=""))
+
+  # update the number of events
+  cn <- within(cn, events[date == s_date] <- events[date == s_date] + 1) # number of events in the month
+  cn <- within(cn, events_accumulated[date == s_date] <- events[date == s_date] + e_acum) # number of events accumulated
+  
+  # update the number of accumulated events
+  e_acum <- e_acum + cn[cn$date == s_date, 3]
+  
+  if (cn_conflict[i, deaths_total] != 0) {
+    
+    # find the row with the date and update it
+    cn <- within(cn, deaths_event[date == s_date] <- cn_conflict[i, deaths_total]) # deaths in the event
+    cn <- within(cn, deaths_accumulated[date == s_date] <- cn_conflict[i, deaths_total] + d_acum) # deaths accumulated
+    
+    # update the accumulated deaths
+    d_acum = d_acum + cn_conflict[i, deaths_total]
+    
+  }
+  
+}
+
+```
+
+
+```{r EDA1}
+# Plotting monthly conflicts by state
+
+parameter_region = "Kachin"
+
+# Select a state
+cn_explore = cn_events_monthly[ which(cn_events_monthly$NAME_1==parameter_region),]
+
+# Line graph
+ggplot(cn_explore, aes(start_dates, deaths_total)) + geom_line() + scale_x_date(date_labels = "%b-%Y") +
+geom_vline(xintercept = as.Date("01-01-2018",  format = "%d-%m-%Y"), linetype = 'dotted', color = 'blue')
+
+# Select the data we need to  draw the map
+cn_explore = cn_explore[c("id","longitude","latitude","deaths_total","impact")]
+# transform the data to spatial coordinates
+coordinates(cn_explore) <- ~longitude+latitude
+
+st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
+tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
+
+# Map of the selected state with the total_deaths as bubbles
+tm_shape(st_layer) +
+    tm_borders(col="black", lwd=1) +
+tm_shape(tw_layer) +
+    tm_borders(col="grey", lwd=1, lty="dashed", alpha=0.6) +
+tm_shape(cn_explore) +
+    tm_bubbles(size="deaths_total", col="impact") + 
+tm_legend(show=TRUE) +
+tm_layout(frame=FALSE)
+
+
+```
+
+
+```{r PRP1}
+# create a spatial dataframe with the coordinates of the events
+
+cn_events_geo = cn_events
+coordinates(cn_events_geo) <- ~longitude+latitude
+
+```
+
+
+```{r EDA1}
+# Plotting conflicts by impact and region
+
+# Select parameters: state and date
+parameter_region <- "Kachin"
+
+st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
+tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
+cn_layer = cn_events_geo[cn_events_geo@data$NAME_1==parameter_region,]
+
+tm_shape(st_layer) +
+    tm_borders(col="black", lwd=1) +
+tm_shape(tw_layer) +
+    tm_borders(col="grey", lwd=1, lty="dashed", alpha=0.6) +
+tm_shape(cn_layer) +
+  tm_bubbles(col = "impact_level",
+          alpha = 0.5,
+          #palette = hcl.colors(6, "Tropic"), 
+          palette = c("white","pink","red","black"),
+          stretch.palette = FALSE,
+          size = 0.6)+
+tm_legend(show=TRUE) +
+tm_layout(frame=FALSE)
+
+
+```
+
+
+```{r PRP12}
+# Create information and geographical layers
+
+# Select parameters: state and date
+parameter_region <- "Kachin"
+parameter_date <- "2018-05-01"
+
+# Select the state and township geographical divisions
+st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
+tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
+
+# Subset the data based on the state
+cn_filter = cn_events_monthly[which(cn_events_monthly$NAME_1==state), ] # 282 obs > 96 obs: 1 loc can have more than 1 event!
+cn_filter = cn_filter[which(cn_filter$month==month(parameter_date) & cn_filter$year==year(parameter_date)), ]
+tw_filter = tw_geo[which(tw_geo@data$NAME_1==parameter_region),]
+nl_filter = nl_data[which(nl_data$state==parameter_region),]
+
+# create spatial points object from the conflict filtered events
+ll_filter <- data.frame(cn_filter$longitude, cn_filter$latitude)
+coordinates(ll_filter) <- ~cn_filter.longitude+cn_filter.latitude
+proj4string(ll_filter) <- proj4string(tw_geo)
+
+# select conflicts data outputs and merge it to the spatial points object
+cn_filter = cn_filter[c("id", "latitude", "longitude", "deaths_high", "impact")]
+ll_filter = SpatialPointsDataFrame(ll_filter, data.frame(ID=cn_filter$id))
+cn_layer = merge(ll_filter, cn_filter, by.x="ID", by.y="id")
+
+# select nightlights period and attach the radiance
+nl_layer <- tw_filter
+nl_layer@data$radiance = nl_filter[which(nl_filter$date==parameter_date),]$radiance
+
+
+```
+
+
+```{r EDA2}
+# Plotting monthly conflicts by state
+
+# Map of the selected state with the total_deaths and impact
+tm <- tm_shape(nl_layer) + 
+  tm_fill(col = "radiance",
+          n = 15,
+          palette = "cividis",
+          contrast = c(0,1)) +
+
+tm_shape(tw_layer) +
+    tm_borders(col = "white", 
+               lwd = 1, 
+               alpha = 0.4) +
+
+tm_shape(cn_layer) +
+  tm_bubbles(size="deaths_high", 
+             col="impact",
+             border.lwd = NA, 
+             alpha = 0.9) + 
+  
+tm_shape(st_layer) +
+    tm_borders(col="black", lwd=1) +
+
+tm_legend(show=TRUE) + 
+tm_layout("Conflicts Impact",
+          legend.title.size = 1,
+          legend.text.size = 0.6,
+          legend.outside.position = c("left","bottom"),
+          legend.bg.color = "white",
+          legend.bg.alpha = 1,
+          legend.outside = TRUE) +
+tm_layout(frame = FALSE)
+
+tm
+
+```
+
+
+```{r PRP2}
+# Create a dataframe with the NL changes by township and region
+
+# initialize dataframe
+nl_changes <- data.frame(region=character(),
+                         township=character(),
+                         first=double(),
+                         last=double(),
+                         stringsAsFactors=FALSE) 
+
+# Calculate changes from first NL reading to last NL reading
+date_first <- as.Date(min(nl_data$date))
+date_last <- as.Date(max(nl_data$date))
+# Changes are normalized by year (like we do with  %  of interest of money):
+# the readings change will be divided by the years between the first and last date
+date_years <- as.numeric(difftime(date_last, date_first, unit="weeks"))/52.25
+
+for (i in 1:length(st_list)) {
+  
+  nl_temp = nl_data[which(nl_data$state==st_list[[i]]), ]
+  nl_temp = nl_temp[(nl_temp$date==date_first | nl_temp$date==date_last),]
+  nl_temp = cast(nl_temp, state+township~date, mean, value = "radiance")
+  names(nl_temp) = c("region", "township", "first", "last")
+  nl_temp$change = nl_temp$last/nl_temp$first/date_years
+
+  # assign levels
+  nl_temp = nl_temp %>% 
+  mutate(level = case_when(
+    change < -0.30 ~ "Strong Decrease",
+    change < -0.05 ~ "Decrease",
+    change < 0.05 ~ "Similar",
+    change < 0.30 ~ "Increase",
+    change >= 0.30 ~ "Strong Increase",
+  ))
+  
+  # append the rows to the nl_changes dataframe
+  nl_changes = rbind(nl_changes, nl_temp)
+
+}
+  
+```
+
+
+```{r EDA2}
+# Plotting levels of nightlights change by region
+
+parameter_region = "Shan"
+
+st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
+tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
+
+nl_layer = tw_geo[which(tw_geo@data$NAME_1==parameter_region),]
+nl_layer@data$change = nl_changes[which(nl_changes$region==parameter_region),5]
+
+myBreaks <- c(-1, -0.3, -0.05, 0.05, 0.3, 1)
+myLabels <- c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
+myPalette <- c("#f2f0f7", "#cbc9e2", "#9e9ac8", "#6a51a3", "#6a51a3")
+
+tm_shape(nl_layer) + 
+  tm_fill(col = "change",
+          #style = "fixed",
+          breaks = myBreaks,
+          labels = myLabels,
+          palette = "RdYlGn",
+          contrast = c(0,1)) +
+
+tm_shape(tw_layer) +
+    tm_borders(col = "white", 
+               lwd = 1, 
+               alpha = 0.4) +
+
+tm_shape(st_layer) +
+    tm_borders(col="black", lwd=1) +
+  
+tm_layout(frame = FALSE)
+
+
+```
+
+
+```{r PRP4}
+# Export files for web app
+
+# Save dataframes
+cn_file = "E:/Data Lights/Shiny/cn_events.rda"
+save(cn_events, file=cn_file)
+
+cn_file = "E:/Data Lights/Shiny/cn_events_geo.rda"
+save(cn_events_geo, file=cn_file)
+
+cn_file = "E:/Data Lights/Shiny/cn_conflicts_list.rda"
+save(cn_conflicts_list, file=cn_file)
+
+nl_file = "E:/Data Lights/Shiny/nl_data.rda"
+save(nl_data, file=nl_file)
+
+nl_file = "E:/Data Lights/Shiny/nl_changes.rda"
+save(nl_changes, file=nl_file)
+
+# Save the dataset as a serialized and compressed version (.rds)
+#cn_file = "E:/Data Lights/Data/conflicts/cn_file.rds"
+#saveRDS(cn_events, cn_file)
+
+# Save map layers
+#map_file = "E:/Data Lights/Shiny"
+#tmap_save(file=map_file)
+
+```
+
