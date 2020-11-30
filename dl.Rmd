@@ -139,9 +139,10 @@ nl_data <- as.data.frame(nl)
 
 # Change the names of the nightlights dataset columns
 names(nl_data) [names(nl_data) == "country"] <- "country"
-names(nl_data) [names(nl_data) == "division_.yin."] <- "state"
+names(nl_data) [names(nl_data) == "division_.yin."] <- "region"
 names(nl_data) [names(nl_data) == "district_.kayaing."] <- "district"
 names(nl_data) [names(nl_data) == "village.township"] <- "township"
+names(nl_data) [names(nl_data) == "area_sq_km"] <- "area"
 
 # No NAs
 
@@ -151,14 +152,16 @@ names(nl_data) [names(nl_data) == "village.township"] <- "township"
 ```{r PRP1}
 # Melt Nightlights dataset by state and township
 
-# From the identifiers columns, we only keep the township
-nl_data <- nl_data[,-c(1,3,5)]
+# From the identifiers columns, we keep region, district, and township
+nl_data <- nl_data[,-c(1,5)]
 
-# Convert the variable in a dataframe
+# Convert in a dataframe
 nl_data <- as.data.frame(nl_data, stringsAsFactors = FALSE)
 
 # Melt the dataset in a more appropriate format for analysis (short)
-nl_data <- melt(nl_data, id=c("state","township"))
+# It can be that the same township has the same name for different districts, so we need 
+# to include that division when melting
+nl_data <- reshape2::melt(nl_data, id=c("region", "district", "township"))
 
 # Convert period (in the column named "variable") in date format
 nl_data$variable = gsub("[^[:digit:]]", "", nl_data$variable)
@@ -167,7 +170,7 @@ nl_data$variable = paste(nl_data$variable, "/01", sep = "")
 nl_data$variable = as.Date(nl_data$variable)
 
 # Assign more identificable names to the columns
-colnames(nl_data) <- c("state", "township", "date", "radiance")
+colnames(nl_data) <- c("region", "district", "township", "date", "radiance")
 
 ```
 
@@ -558,7 +561,9 @@ cn = as.data.frame(setDT(cn_conflict)[, .(date = seq(cn_start, cn_end, by = "mon
 # fill up the dataframe with the months without events
 complete(cn, conflict_id, date)
 
-# initialize variables 
+# initialize variables
+cn$region
+cn$conflict
 cn$events = 0 # number of events active in the month
 cn$events_accumulated = 0 # number of events accumulated
 cn$deaths_event = 0 # deaths accumulated at the end of the event
@@ -654,7 +659,7 @@ coordinates(cn_events_geo) <- ~longitude+latitude
 # Plotting conflicts by impact and region
 
 # Select parameters: state and date
-parameter_region <- "Kachin"
+parameter_region = "Kachin"
 
 st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
 tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
@@ -681,29 +686,27 @@ tm_layout(frame=FALSE)
 ```{r PRP12}
 # Create information and geographical layers
 
-# Select parameters: state and date
-parameter_region <- "Kachin"
-parameter_date <- "2018-05-01"
+# Select parameters: region and date
+parameter_region = "Kachin"
+parameter_date = "2018-05-01"
 
-# Select the state and township geographical divisions
+# Select the region and township geographical divisions
 st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
 tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
 
-# Subset the data based on the state
-cn_filter = cn_events_monthly[which(cn_events_monthly$NAME_1==state), ] # 282 obs > 96 obs: 1 loc can have more than 1 event!
-cn_filter = cn_filter[which(cn_filter$month==month(parameter_date) & cn_filter$year==year(parameter_date)), ]
+# Subset the events on the region
+ev_filter = cn_events_monthly[which(cn_events_monthly$NAME_1==parameter_region), ]
+# 282 obs > 96 obs: 1 loc can have more than 1 event as we have spitted them by month
+# Subset the events on the date
+ev_filter = ev_filter[which(ev_filter$month==month(parameter_date) & ev_filter$year==year(parameter_date)), ]
+
 tw_filter = tw_geo[which(tw_geo@data$NAME_1==parameter_region),]
-nl_filter = nl_data[which(nl_data$state==parameter_region),]
+nl_filter = nl_data[which(nl_data$region==parameter_region),]
 
-# create spatial points object from the conflict filtered events
-ll_filter <- data.frame(cn_filter$longitude, cn_filter$latitude)
-coordinates(ll_filter) <- ~cn_filter.longitude+cn_filter.latitude
-proj4string(ll_filter) <- proj4string(tw_geo)
-
-# select conflicts data outputs and merge it to the spatial points object
-cn_filter = cn_filter[c("id", "latitude", "longitude", "deaths_high", "impact")]
-ll_filter = SpatialPointsDataFrame(ll_filter, data.frame(ID=cn_filter$id))
-cn_layer = merge(ll_filter, cn_filter, by.x="ID", by.y="id")
+# select events information outputs 
+ev_layer = ev_filter[c("id", "latitude", "longitude", "deaths_high", "impact")]
+# Create a spatial points object
+coordinates(ev_layer) <- ~longitude+latitude
 
 # select nightlights period and attach the radiance
 nl_layer <- tw_filter
@@ -714,9 +717,9 @@ nl_layer@data$radiance = nl_filter[which(nl_filter$date==parameter_date),]$radia
 
 
 ```{r EDA2}
-# Plotting monthly conflicts by state
+# Plotting monthly conflicts by region
 
-# Map of the selected state with the total_deaths and impact
+# Map of the selected region with the total_deaths and impact
 tm <- tm_shape(nl_layer) + 
   tm_fill(col = "radiance",
           n = 15,
@@ -728,7 +731,7 @@ tm_shape(tw_layer) +
                lwd = 1, 
                alpha = 0.4) +
 
-tm_shape(cn_layer) +
+tm_shape(ev_layer) +
   tm_bubbles(size="deaths_high", 
              col="impact",
              border.lwd = NA, 
@@ -757,6 +760,7 @@ tm
 
 # initialize dataframe
 nl_changes <- data.frame(region=character(),
+                         district=character(),
                          township=character(),
                          first=double(),
                          last=double(),
@@ -771,10 +775,10 @@ date_years <- as.numeric(difftime(date_last, date_first, unit="weeks"))/52.25
 
 for (i in 1:length(st_list)) {
   
-  nl_temp = nl_data[which(nl_data$state==st_list[[i]]), ]
+  nl_temp = nl_data[which(nl_data$region==st_list[[i]]), ]
   nl_temp = nl_temp[(nl_temp$date==date_first | nl_temp$date==date_last),]
-  nl_temp = cast(nl_temp, state+township~date, mean, value = "radiance")
-  names(nl_temp) = c("region", "township", "first", "last")
+  nl_temp = cast(nl_temp, region+district+township~date, mean, value = "radiance")
+  names(nl_temp) = c("region", "district", "township", "first", "last")
   nl_temp$change = nl_temp$last/nl_temp$first/date_years
 
   # assign levels
@@ -851,13 +855,6 @@ save(nl_data, file=nl_file)
 nl_file = "E:/Data Lights/Shiny/nl_changes.rda"
 save(nl_changes, file=nl_file)
 
-# Save the dataset as a serialized and compressed version (.rds)
-#cn_file = "E:/Data Lights/Data/conflicts/cn_file.rds"
-#saveRDS(cn_events, cn_file)
-
-# Save map layers
-#map_file = "E:/Data Lights/Shiny"
-#tmap_save(file=map_file)
 
 ```
 

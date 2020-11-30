@@ -25,30 +25,142 @@ server <- function(input, output, session){
     
     ### Data Manipulations -----------------------------------------------------
     
-    # update the data for the plot
+    # regional shape
+    st_data <- reactive({
+        region <- input$region
+        if(is.null(region)) {
+            region <- "Kachin"
+        }
+        
+        st_geo[st_geo@data$NAME_1==region,]
+        
+    })
+    
+    # night lights information
+    nl_data <- reactive({
+        region <- input$region
+        if(is.null(region)) {
+            region <- "Kachin"
+        }
+
+        nl_data = tw_geo[tw_geo@data$NAME_1==region,]
+        nl_data@data$change = nl_changes[which(nl_changes$region==region), 6]
+        nl_data
+    })
+    
+    # events information
+    ev_data <- reactive({
+        region <- input$region
+        if(is.null(region)) {
+            region <- "Kachin"
+        }
+        
+        ev_data = cn_events_geo[cn_events_geo@data$NAME_1==region,]
+        ev_data
+    })
+    
+    # data for the exploration plot
     load_cn_data <- reactive({
-        x <- cn_data
+        x <- cn_events
     })
     
     ### Map Output -------------------------------------------------------------
     
-    # draw the map with the selected parameters
+    # draw the map when
     output$map <- renderTmap(
-        draw_NLchanges_map("map", input$region)
+        
+        if (!rlang::is_empty(ev_data())) {
+        tm_shape(st_data()) +
+            tm_borders(col="black", 
+                       lwd=2,
+                       alpha = 1) +
+            
+            # nightlights layer
+            tm_shape(nl_data()) + 
+            tm_fill(col = "change",
+                    breaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1),
+                    labels = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase"),
+                    palette = "RdYlGn",
+                    contrast = c(0,1),
+                    zindex = 402,
+                    legend.show = TRUE,
+                    legend.z = 1) +
+            tm_borders(col = "black", 
+                       lwd = 1, 
+                       lty="dotted",
+                       alpha = 0.5,
+                       zindex = 403) +
+            tm_legend(show=TRUE) +
+            
+            # events layer
+            tm_shape(ev_data()) +
+            tm_bubbles(col = "impact_level",
+                       alpha = 0.5,
+                       palette = c("white","pink","red","black"),
+                       size = 0.25,
+                       zindex = 404) +
+            tm_legend(show=TRUE)
+        } else {
+            
+            tm_shape(st_data()) +
+                tm_borders(col="black", 
+                           lwd=2,
+                           alpha = 1) +
+                
+                # nightlights layer
+                tm_shape(nl_data()) + 
+                tm_fill(col = "change",
+                        breaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1),
+                        labels = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase"),
+                        palette = "RdYlGn",
+                        contrast = c(0,1),
+                        zindex = 402,
+                        legend.show = TRUE,
+                        legend.z = 1) +
+                tm_borders(col = "black", 
+                           lwd = 1, 
+                           lty="dotted",
+                           alpha = 0.5,
+                           zindex = 403) +
+                tm_legend(show=TRUE) 
+        }
+
     )
-
+    
+    # update regional shape
     observe({
-        region <- input$region
-        #addLayer_map("map", "eventsLocation_layer", region, session)
+        
+        if (!rlang::is_empty(st_data())) {
+            
+            draw_region_map("map", st_data(), session)
+        }
+    })
 
+    # update nightlights information
+    observe({
+        
+        if (!rlang::is_empty(nl_data())) {
+           
+            draw_nl_layer("map", nl_data(), session)
+        }
+    })
+    
+    # update events information
+    observe({
+        
+        if (!rlang::is_empty(ev_data())) {
+            
+            draw_events_layer("map", ev_data(), session)
+            
+        }
     })
     
     ### Explore Output ---------------------------------------------------------
 
     # KPI-1
     output$KPI1 <- renderValueBox({
-        valueBox(tags$p("90", style = "font-size: 50%;"), 
-                 subtitle=tags$p("Deaths linked to the conflict", style = "font-size: 70%;"),
+        valueBox(tags$p(paste0(90,"%"), style = "font-size: 50%;"), 
+                 subtitle=tags$p("Impact of events in the area", style = "font-size: 70%;"),
                  icon = icon("skull-crossbones"), 
                  color="blue",
                  width=4)
@@ -56,8 +168,8 @@ server <- function(input, output, session){
     
     # KPI-2
     output$KPI2 <- renderValueBox({
-        valueBox(tags$p(paste0(80,"%"), style = "font-size: 50%;"), 
-                 subtitle=tags$p("Nightlights level change", style = "font-size: 70%;"),
+        valueBox(tags$p(paste0(50,"%"), style = "font-size: 50%;"), 
+                 subtitle=tags$p("Lights change in the area", style = "font-size: 70%;"),
                  icon = icon("sun"), 
                  color="aqua")
     })

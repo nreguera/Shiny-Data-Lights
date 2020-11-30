@@ -43,11 +43,6 @@
 	background-color: #F5F5F5 !important;
 	border-style: none !important;
  }
- 
- /* separator */
- hr {
-  border-top: 2px solid #FFFFFF;
-}
   
 .messages {
 	background-color: #F2F2F2 !important;
@@ -123,10 +118,17 @@
 
 }
 
+#map{
+	border-radius: 5px !important;
+	z-index: 500
+}
+
 #past{
+	border-radius: 5px !important;
 	padding-top: 0.5% !important;
 	padding-left: 0.5% !important;
 	padding-right: 0.5% !important;
+	margin: 0% !important;
 }
 
 #KPI1{
@@ -144,11 +146,17 @@
 
 /* icons */
 .fa {
-	font-size: 53% !important;
+	font-size: 50% !important;
 }
 
 
 /* Paragraphs */
+ hr {
+  border-top: 1px solid #E1E1E1;
+  margin-bottom: 10% !important;
+  margin-top: 10% !important;
+}
+
 h5 {
 	font-size:12px;
 	font-weight: bold;

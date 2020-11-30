@@ -46,7 +46,7 @@ ui <- shinyUI(fluidPage(
         
         hr(),
 
-        h5("Select the parameters for the analysis"),
+        h5("Adjust the parameters for the analysis"),
      
         selectInput("region",
                     h6("Region or state:"),
@@ -108,7 +108,7 @@ ui <- shinyUI(fluidPage(
         top = "auto", left = "1%", bottom = "5%",
         width = "18%", height = "6%",
        
-        "App in development v.16,",
+        "App in development v.17,",
         br(),
         "some features may not be available.",
 
@@ -163,7 +163,7 @@ ui <- shinyUI(fluidPage(
         width = "26%", height = "38%",
         
         # plot
-        h5("Past and future changes in Nightlights", style = "text-align: center; padding-top: 5px;")
+        h5("Human movements predictions", style = "text-align: center; padding-top: 5px;")
        
       ), # absolute panel - Predictions
            

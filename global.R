@@ -12,14 +12,11 @@ require(rgeos)
 
 ### Read in data files ---------------------------------------------------------
 
-# load geo files
+# load GADM files
 co_geo <- readRDS("gadm36_MMR_0_sp.rds")
 st_geo <- readRDS("gadm36_MMR_1_sp.rds")
 ds_geo <- readRDS("gadm36_MMR_2_sp.rds")
 tw_geo <- readRDS("gadm36_MMR_3_sp.rds")
-
-#nl_layer <- readOGR(dsn = ".", layer = "nl_layer")
-#cn_layer <- readOGR(dsn = ".", layer = "cn_layer")
 
 # load dataframes
 load(file="cn_events.rda")
@@ -32,6 +29,8 @@ load(file="nl_changes.rda")
 ### Set variables --------------------------------------------------------------
 
 parameter_date = "2018-05-01"
+st_layer = st_geo[st_geo@data$NAME_1=="Kachin",]
+
 
 ### Functions to display correct UI options ------------------------------------
 
@@ -86,75 +85,70 @@ draw_NL_map <- function(map, region) {
 
 }
 
+draw_region_map <- function(map, layer, session) {
 
-draw_NLchanges_map <- function(map, region) {
-
-  st_layer = st_geo[st_geo@data$NAME_1==region,]
-  tw_layer = tw_geo[tw_geo@data$NAME_1==region,]
-  
-  nl_layer = tw_geo[which(tw_geo@data$NAME_1==region),]
-  nl_layer@data$change = nl_changes[which(nl_changes$region==region),5]
-
-  cn_layer = cn_events_geo[cn_events_geo@data$NAME_1==region,]
-  
-  myBreaks <- c(-1, -0.3, -0.05, 0.05, 0.3, 1)
-  myLabels <- c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
-  myPalette <- c("#f2f0f7", "#cbc9e2", "#9e9ac8", "#6a51a3", "#6a51a3")
-  
-  tm_shape(nl_layer) + 
-    tm_fill(col = "change",
-            #style = "fixed",
-            breaks = myBreaks,
-            labels = myLabels,
-            palette = "RdYlGn",
-            contrast = c(0,1),
-            zindex = 403,
-            legend.show = TRUE,
-            legend.z = 1) +
-
-  tm_shape(cn_layer) +
-    tm_bubbles(col = "impact_level",
-             alpha = 0.5,
-             palette = c("white","pink","red","black"),
-             size = 0.5,
-             zindex = 403) +
-
-  tm_shape(tw_layer) +
-    tm_borders(col = "grey", 
-             lwd = 1, 
-             alpha = 0.8,
-             zindex = 401) +
-  
-  tm_shape(st_layer) +
+  tmapProxy("map", session, {
+    
+    # remove layers
+    tm_remove_layer(401) +
+    
+    # add layers  
+    tm_shape(layer) +
     tm_borders(col="black", 
-               lwd=1,
+               lwd=2,
                alpha = 0.8,
-               zindex = 402) +
-  
-  tm_legend(show=TRUE) +
-  tm_layout(frame = FALSE)
-  
+               zindex = 401) +
+    tm_layout(frame = FALSE)
+    
+  })
 }
 
-addLayer_map <- function(map, layer, region, session) {
- 
-  # layer will be used to "case" different types of info
-  cn_layer = cn_events_geo[cn_events_geo@data$NAME_1==region,]
+draw_nl_layer <- function(map, layer, session) {
   
-  tmapProxy(map, session, {
-
-    # remove layers
-    tm_remove_layer(403) + # zindex = 403 is the layer id 
+  tmapProxy("map", session, {
     
+    # remove layers
+    tm_remove_layer(402) +
+      tm_remove_layer(403) +
+      
     # add layers
-    tm_shape(cn_layer) +
-      tm_bubbles(col = "impact_level",
-                 alpha = 0.5,
-                 palette = c("white","pink","red","black"),
-                 size = 0.5,
-                 zindex = 403) +
+    tm_shape(layer) + 
+    tm_fill(col = "change",
+            breaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1),
+            labels = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase"),
+            palette = "RdYlGn",
+            contrast = c(0,1),
+            zindex = 402,
+            legend.show = TRUE,
+            legend.z = 1) +
+    tm_borders(col = "black", 
+               lwd = 1, 
+               lty="dotted",
+               alpha = 0.5,
+               zindex = 403) +
     tm_legend(show=TRUE)
-  }) 
+    
+  })
+}
+
+draw_events_layer <- function(map, layer, session) {
+  
+    tmapProxy("map", session, {
+  
+      # remove layers
+      tm_remove_layer(404) +
+      
+      # add layers
+      tm_shape(layer) +
+        tm_bubbles(col = "impact_level",
+                   alpha = 0.5,
+                   palette = c("white","pink","red","black"),
+                   size = 0.25,
+                   zindex = 404) +
+      tm_legend(show=TRUE)
+      
+    })
+    
 }
 
 
