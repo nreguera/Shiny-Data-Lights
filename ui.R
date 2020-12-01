@@ -105,12 +105,12 @@ ui <- shinyUI(fluidPage(
       
         id = "messages", class = "messages", 
         fixed = TRUE, draggable = FALSE, 
-        top = "auto", left = "1%", bottom = "5%",
-        width = "18%", height = "6%",
+        top = "auto", left = "0%", bottom = "4.5%",
+        width = "16%", height = "6%",
        
-        "App in development v.17,",
+        "App in development [v.18]",
         br(),
-        "some features may not be available.",
+        "Some features may not be available",
 
       ), # absolute panel - Messages
                
@@ -149,7 +149,7 @@ ui <- shinyUI(fluidPage(
         ),
         
         # plot
-        h5("Events and deaths over the population", style = "text-align: center;"),
+        h5("Severity of the events in the region", style = "text-align: center;"),
         plotOutput("explore_plot", width = "97%", height = "65%")
       
       ), # absolute panel - Explorations
@@ -159,7 +159,7 @@ ui <- shinyUI(fluidPage(
        
         id = "future", class = "panel panel-default",
         fixed = TRUE, draggable = FALSE, 
-        top = "auto", right = "1%", bottom = "1.8%",
+        top = "auto", right = "1%", bottom = "1.6%",
         width = "26%", height = "38%",
         
         # plot

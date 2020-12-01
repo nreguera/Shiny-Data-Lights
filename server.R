@@ -61,7 +61,13 @@ server <- function(input, output, session){
     
     # data for the exploration plot
     load_cn_data <- reactive({
-        x <- cn_events
+        
+        cn_explore = cn_events_explore[cn_events_explore$NAME_1==input$region,]
+        cn_explore = cn_explore[cn_explore$date_start >= parameter_date,]
+        cn_explore = as.data.frame(cn_explore)
+        cn_explore
+
+        
     })
     
     ### Map Output -------------------------------------------------------------
@@ -162,7 +168,7 @@ server <- function(input, output, session){
         valueBox(tags$p(paste0(90,"%"), style = "font-size: 50%;"), 
                  subtitle=tags$p("Impact of events in the area", style = "font-size: 70%;"),
                  icon = icon("skull-crossbones"), 
-                 color="blue",
+                 color="black",
                  width=4)
     })
     
@@ -171,21 +177,48 @@ server <- function(input, output, session){
         valueBox(tags$p(paste0(50,"%"), style = "font-size: 50%;"), 
                  subtitle=tags$p("Lights change in the area", style = "font-size: 70%;"),
                  icon = icon("sun"), 
-                 color="aqua")
+                 color="black")
     })
     
     # Explore plot
     explore_plot <- reactive({
-        ggplot(data=load_cn_data(), aes(x=as.numeric(year), y=deaths_total, group=1)) +
-            geom_line() +
-            geom_point() +
-            theme(axis.title.x = element_blank(),
-                  axis.title.y = element_blank())
+        
+        ggplot(data=load_cn_data(), aes(x=date_start, y=deaths_total, group=1)) +
+            geom_point(color="red", size=2) +
+            theme(
+                legend.position = "none",
+                plot.background = element_blank(),
+                panel.background = element_rect(fill = "#FFFFFF"),
+                panel.border = element_blank(),
+                panel.grid = element_blank(),
+                panel.grid.major = element_blank(),
+                panel.grid.minor = element_blank(),
+                panel.grid.major.x = element_line(size = 0.5, 
+                                                  linetype = 'dotted',
+                                                  colour = "grey"), 
+                panel.grid.major.y = element_line(size = 0.5, 
+                                                  linetype = 'dotted',
+                                                  colour = "grey"), 
+                panel.grid.minor.x = element_blank(),
+                panel.grid.minor.y = element_blank(),
+                axis.ticks = element_blank()
+            ) +
+            xlab("") +
+            ylab("") 
+            
     })
     
     # Plot
     output$explore_plot <- renderPlot({
-        explore_plot()
+        
+        # check if there are events in the selected region
+        if (is.data.frame(load_cn_data()) && nrow(load_cn_data())==0) {
+            # if not, draw and empty plot
+            plot.new()
+        } else {
+            explore_plot()
+        }
+        
     })
 
     ### Predict Output ---------------------------------------------------------

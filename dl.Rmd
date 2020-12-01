@@ -56,6 +56,7 @@ library(ggplot2)
 library(tmap)
 library(highcharter)
 library(leaflet)
+library(hrbrthemes)
 
 # Clear console
 cat("\014")
@@ -318,8 +319,6 @@ co_geo <- readRDS(mm_file)
 mm_file <- paste(dr_data, "geo/gadm36_MMR_1_sp.rds", sep="")
 st_geo <- readRDS(mm_file)
 
-st_geo <- readRDS("E:/Data Lights/Shiny/gadm36_MMR_1_sp.rds")
-
 # District level
 mm_file <- paste(dr_data, "geo/gadm36_MMR_2_sp.rds", sep="")
 ds_geo <- readRDS(mm_file)
@@ -538,6 +537,75 @@ for (i in 1:nrow(cn_conflicts_list)) {
   }
 
 }
+
+```
+
+
+
+```{r PRP2}
+# Create a dataset with severity and length of the events
+
+# Subset the events dataframe
+columns <- c("id", "type_of_violence", "conflict_id", "date_start", "date_end", "deaths_civilians", "deaths_total", "NAME_1", "NAME_3", "impact_level")
+cn_events_explore = cn_events[columns]
+
+# Add a column with the length
+cn_events_explore$length = 0
+for (i in 1:nrow(cn_events_explore)) {
+  
+  start = as.Date(cn_events_explore[i, 4])
+  end = as.Date(cn_events_explore[i, 5])
+  
+  cn_events_explore[i, 11] = 
+    round(as.numeric(difftime(end, start, unit="weeks"))/52.25,digits = 2)
+
+}
+
+# reorganize the columns
+col_order <- c("NAME_1", "NAME_3", "conflict_id", "id", 
+               "date_start", "date_end", "length",
+               "deaths_civilians", "deaths_total", "impact_level")
+cn_events_explore <- cn_events_explore[, col_order]
+
+```
+
+
+```{r EXP2}
+# Creating the exploring viz from previous dataframe
+
+parameter_region = "Kachin"
+parameter_date = as.Date("2012-04-01")
+cn_explore = cn_events_explore[cn_events_explore$NAME_1==parameter_region,]
+
+cn_explore = cn_explore %>%
+ filter(date_start >= parameter_date)
+
+# Cleveland Plot
+ggplot(cn_explore) +
+  geom_segment( aes(x=deaths_total, xend=deaths_total, y=date_start, yend=date_end), color="grey") +
+  geom_point( aes(x=deaths_total, y=date_start), color=rgb(0.2,0.7,0.1,0.5), size=1 ) +
+  geom_point( aes(x=deaths_total, y=date_end), color=rgb(0.7,0.2,0.1,0.5), size=3) +
+  coord_flip()+
+  theme(
+    legend.position = "none",
+    plot.background = element_blank(),
+    panel.background = element_rect(fill = "#FFFFFF"),
+    panel.border = element_blank(),
+    panel.grid = element_line(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(size = 0.5, 
+                                      linetype = 'dotted',
+                                      colour = "black"), 
+    panel.grid.major.y = element_line(size = 0.5, 
+                                      linetype = 'dotted',
+                                      colour = "black"), 
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_blank()
+  ) +
+  xlab("") +
+  ylab("")
+
 
 ```
 
@@ -848,6 +916,9 @@ save(cn_events_geo, file=cn_file)
 
 cn_file = "E:/Data Lights/Shiny/cn_conflicts_list.rda"
 save(cn_conflicts_list, file=cn_file)
+
+cn_file = "E:/Data Lights/Shiny/cn_events_explore.rda"
+save(cn_events_explore, file=cn_file)
 
 nl_file = "E:/Data Lights/Shiny/nl_data.rda"
 save(nl_data, file=nl_file)

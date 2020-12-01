@@ -9,6 +9,7 @@
 ### Load the libraries ---------------------------------------------------------
 library(rgdal)
 require(rgeos)
+library(ggplot2)
 
 ### Read in data files ---------------------------------------------------------
 
@@ -22,13 +23,14 @@ tw_geo <- readRDS("gadm36_MMR_3_sp.rds")
 load(file="cn_events.rda")
 load(file="cn_events_geo.rda")
 load(file="cn_conflicts_list.rda")
+load(file="cn_events_explore.rda")
 load(file="nl_data.rda")
 load(file="nl_changes.rda")
 
 
 ### Set variables --------------------------------------------------------------
 
-parameter_date = "2018-05-01"
+parameter_date = as.Date("2012-04-01")
 st_layer = st_geo[st_geo@data$NAME_1=="Kachin",]
 
 
@@ -154,7 +156,11 @@ draw_events_layer <- function(map, layer, session) {
 
 ### Functions for the exploration plot -----------------------------------------
 
+draw_plot <- function(region){
+  
 
+  
+}
 
 
 ### Functions for the prediction plot ------------------------------------------
