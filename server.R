@@ -70,13 +70,22 @@ server <- function(input, output, session){
         
     })
     
+    # data for the prediction plot
+    md_data <- reactive ({
+        
+        region <- input$region
+        
+        md_final[md_final$region == region,]
+
+    })
+    
     ### Map Output -------------------------------------------------------------
     
     # draw the map when
     output$map <- renderTmap(
         
         if (!rlang::is_empty(ev_data())) {
-        tm_shape(st_data()) +
+        tm <- tm_shape(st_data()) +
             tm_borders(col="black", 
                        lwd=2,
                        alpha = 1) +
@@ -96,16 +105,31 @@ server <- function(input, output, session){
                        lty="dotted",
                        alpha = 0.5,
                        zindex = 403) +
-            tm_legend(show=TRUE) +
+            tm_layout(legend.show=TRUE,
+                      "Wealth (or so)",
+                      legend.title.size = 1,
+                      legend.text.size = 0.6,
+                      legend.position = c("left","bottom"),
+                      legend.bg.color = "white",
+                      legend.bg.alpha = 1) +
             
             # events layer
             tm_shape(ev_data()) +
-            tm_bubbles(col = "impact_level",
+            tm_bubbles(col = "black",
                        alpha = 0.5,
-                       palette = c("white","pink","red","black"),
                        size = 0.25,
                        zindex = 404) +
-            tm_legend(show=TRUE)
+            tm_layout(legend.show=FALSE) +
+                tm_view(control.position=c("right","bottom"),
+                        view.legend.position=c("left","bottom"))
+            
+            # Pipe the tmap object into tmap_leaflet() to create a leaflet widget,
+            # so that we can use leaflet::hideGroup().
+            #tm = tm %>% 
+            #    tmap_leaflet() %>%
+            #    leaflet::hideGroup(ev_data())
+            tm
+            
         } else {
             
             tm_shape(st_data()) +
@@ -128,7 +152,13 @@ server <- function(input, output, session){
                            lty="dotted",
                            alpha = 0.5,
                            zindex = 403) +
-                tm_legend(show=TRUE) 
+                tm_layout(legend.show=TRUE,
+                          "Wealth (or so)",
+                          legend.title.size = 1,
+                          legend.text.size = 0.6,
+                          legend.position = c("left","bottom"),
+                          legend.bg.color = "white",
+                          legend.bg.alpha = 1)
         }
 
     )
@@ -185,6 +215,7 @@ server <- function(input, output, session){
         
         ggplot(data=load_cn_data(), aes(x=date_start, y=deaths_total, group=1)) +
             geom_point(color="red", size=2) +
+            geom_smooth(method = "lm") +
             theme(
                 legend.position = "none",
                 plot.background = element_blank(),
@@ -219,10 +250,41 @@ server <- function(input, output, session){
             explore_plot()
         }
         
-    })
+    }, bg="transparent")
 
     ### Predict Output ---------------------------------------------------------
     
+    output$prediction_plot <- renderPlotly({
+        
+
+        p <- ggplot(md_data(), aes(month, township, fill=population)) +
+            geom_tile(color="white", size=0.5) + 
+            scale_fill_viridis(name="Population", option="E") +
+            facet_grid(.~year)
+        
+        p <- p + theme(
+            panel.spacing.x=unit(0.05, "lines"), 
+            panel.spacing.y=unit(0.01, "npc"),
+            panel.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
+            plot.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
+            plot.title=element_blank(),
+            legend.position = "none",
+            axis.title.y=element_blank(),
+            axis.text.y=element_blank(),
+            axis.ticks.y=element_blank(),
+            axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank(),
+            axis.text=element_text(size=10),
+            strip.background = element_blank()
+        ) +
+            xlab("") + 
+            ylab("") +
+            removeGrid()
+        
+        ggplotly(p)
+
+    })
     
     ### Township Click Event ---------------------------------------------------
 

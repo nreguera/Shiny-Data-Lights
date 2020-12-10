@@ -29,6 +29,23 @@
   margin-top: 10% !important;
 }
 
+h2{
+	font-size:14px;
+	font-weight: bold;
+	color: #000;
+	position: absolute;
+	left: 10%;
+	text-align: center;
+	background: "white";
+	z-index: 998;
+}
+
+h4 {
+	font-size:14px;
+	font-weight: bold;
+	margin-bottom: 0.8em ;
+}
+
 h5 {
 	font-size:12px;
 	font-weight: bold;
@@ -123,15 +140,18 @@ h6 {
 
 #map{
 	border-radius: 5px !important;
-	z-index: 500
+	position: absolute;
+}
+  
+#map:before {
+	position: absolute;
+	content: '';
+	height: 100%;
+	width: 100%;
+	z-index: 999;
 }
 
 /* EXPLORE */
-
-.graphs {
-	background-color: #FFFFFF !important;
-	border-style: solid !important;
- }
 
 /* Valuebox */
 .small-box {
@@ -161,14 +181,6 @@ h6 {
 	opacity:0.6;
 }
 
-#past{
-	border-radius: 5px !important;
-	padding-top: 0.5% !important;
-	padding-left: 0.5% !important;
-	padding-right: 0.5% !important;
-	margin: 0% !important;
-}
-
 #KPI1{
 	overflow: hidden !important;
 }
@@ -177,9 +189,25 @@ h6 {
 	overflow: hidden !important;
 }
 
+/* Plot */
+#past{
+	border-radius: 5px !important;
+	padding-top: 0.5% !important;
+	padding-left: 0.5% !important;
+	padding-right: 0.5% !important;
+	margin: 0% !important;
+}
+
+
 /* PREDICT */
 
 #future {
+	border-radius: 8px !important;
+	text-align: center !important;
+	padding-top: 0% !important;
 	background-color: rgba(255,255,255,0);
 }
 
+#prediction_plot {
+	margin: 1.5% !important;
+}

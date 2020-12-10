@@ -10,7 +10,7 @@ output: html_document
 <br>
 <br>
 
-### THE DATA
+### OPEN DATA
 
 <br>
 <br>

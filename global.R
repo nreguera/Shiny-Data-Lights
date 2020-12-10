@@ -11,6 +11,16 @@ library(rgdal)
 require(rgeos)
 library(ggplot2)
 
+
+#for the prediction
+
+library(dplyr) # easier data wrangling 
+library(viridis) # colour blind friendly palette, works in B&W also
+library(lubridate) # for easy date manipulation
+library(ggExtra) # because remembering ggplot theme options is beyond me
+library(tidyr) 
+library(plotly)
+
 ### Read in data files ---------------------------------------------------------
 
 # load GADM files
@@ -26,6 +36,7 @@ load(file="cn_conflicts_list.rda")
 load(file="cn_events_explore.rda")
 load(file="nl_data.rda")
 load(file="nl_changes.rda")
+load(file="md_final.rda")
 
 
 ### Set variables --------------------------------------------------------------

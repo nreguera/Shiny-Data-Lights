@@ -1,5 +1,5 @@
 
-```{r SET1, eval=TRUE, include=FALSE}
+```{r SET, eval=TRUE, include=FALSE}
 # General setup parameters
 
 # SET: Settings
@@ -7,6 +7,7 @@
 # CLN: Clean Data
 # PRP: Process Data
 # EDA: Explore Data
+# MOD: Model Data
 
 myPaths <- .libPaths() # get the current library paths
 myPaths <- c("E:/R/Libraries/4.0.2", myPaths[1])  # add the new path
@@ -21,25 +22,16 @@ knitr::opts_chunk$set(message = FALSE,
                       echo = FALSE,
                       cache = FALSE)
 
-# Directories
-dr_cache = "Cache/"
-dr_outputs = "Outputs/"
-dr_data = "Data/"
-
-# Clear console
-cat("\014")
 
 ```
 
 
-```{r SET2}
+```{r SET}
 # Load libraries
 
 # Load data
 library(readxl)
-#library(Rnightlights)
-
-# Clean data
+library(Rnightlights)
 
 # Process data
 library(sp)
@@ -50,6 +42,7 @@ library(reshape)
 library(rgdal)
 require(rgeos)
 library(data.table)
+library(sf)
 
 # Explore data
 library(ggplot2)
@@ -57,6 +50,12 @@ library(tmap)
 library(highcharter)
 library(leaflet)
 library(hrbrthemes)
+library(plotly)
+library(viridis)
+library(ggExtra)
+library(tidyr) 
+
+# Model data
 
 # Clear console
 cat("\014")
@@ -64,7 +63,17 @@ cat("\014")
 ```
 
 
-```{r SET3, eval=FALSE}
+```{r SET}
+
+# Directories
+dir_cache = "Cache/"
+dir_outputs = "Outputs/"
+dir_data = "Data/"
+
+```
+
+
+```{r SET, eval=FALSE}
 # Setup specific libraries parameters
 
 # Regional setup
@@ -72,7 +81,14 @@ Sys.setlocale("LC_TIME", "English")
 Sys.setlocale(locale="UTF-8")
 
 # Setup to improve performance downloading data for Rnightlights
-pkgOptions(downloadMethod="aria, extractMethod="rast", numCores=4, deleteTiles=TRUE)
+pkgOptions(downloadMethod="aria", extractMethod="rast", numCores=4, deleteTiles=TRUE)
+
+# to know which admLevel select in the getCtryNlData function AND create the CSV structure
+searchAdmLevel(ctryCode = "MMR", 
+               custPolyPath = paste0(dir_data,
+                                     "/geo/MIMU/mmr_polbnda_250k_adm3_mimu.zip",
+                                     sep="",
+                                     collapse=NULL))
 
 ```
 
@@ -103,27 +119,30 @@ expand_dates <- function(start, end) {
 ```
 
 
-```{r LDA1, eval=FALSE}
+```{r LDA, eval=FALSE}
 # Download Nightlights data by country
 
 # (ISO3) country code
 ctry <- "MMR"
 
-# Download rasters (images) and radiance readings (csv)
-nl_source <- getCtryNlData(ctryCode = ctry, # country selected
-                    admLevel = "admin3", # lowest level of detail
-                    nlType = "VIIRS.M", # monthly values
-                    nlPeriods = nlRange("201204", "201212"),
-                    ignoreMissing = FALSE, # not ignoring missing values
-                    nlStats = list("mean", na.rm=FALSE)) # aggregation: average
+# Download rasters (tiff) and radiance readings (csv)
+nl_source <- getCtryNlData(
+  ctryCode = ctry, # country
+  custPolyPath = "mmr_polbnda_250k_adm3_mimu.zip",
+  admLevel = "0_mmr_polbnda_250k_adm3_mimu", # admin level
+  nlType = "VIIRS.M", # monthly values
+  nlPeriods = nlRange("201204", "201212"),
+  ignoreMissing = FALSE, # not ignoring missing values
+  nlStats = list("mean", na.rm=FALSE) # aggregation: average 
+)
 
-```
+``` 
 
 
-```{r LDA2}
+```{r LDA}
 # Load nightlights data
 
-nl_file <- paste(dr_data, "nl/NL_DATA_MMR_ADM3_GADM-3.6-SHPZIP.csv", sep="", collapse=NULL)
+nl_file <- paste(dir_data, "nl/NL_DATA_MMR_ADM3_GADM-3.6-SHPZIP.csv", sep="", collapse=NULL)
 
 nl <- read.csv(file=nl_file,
                header=TRUE, 
@@ -133,7 +152,7 @@ nl <- read.csv(file=nl_file,
 ```
 
 
-```{r CLN1}
+```{r CLN}
 # Clean Nightlights dataset
 
 nl_data <- as.data.frame(nl)
@@ -147,13 +166,17 @@ names(nl_data) [names(nl_data) == "area_sq_km"] <- "area"
 
 # No NAs
 
+# There are 2 townships with the same name in the same region, so we will use for the Maubin region
+# township the name that appears in the VARNAME_3 column: "Danuphyu"
+nl_data[14, 4] <- "Danuphyu"
+
 ```
 
 
-```{r PRP1}
-# Melt Nightlights dataset by state and township
+```{r PRP}
+# Melt Nightlights data by region, district and township
 
-# From the identifiers columns, we keep region, district, and township
+# Drop country and area
 nl_data <- nl_data[,-c(1,5)]
 
 # Convert in a dataframe
@@ -176,7 +199,7 @@ colnames(nl_data) <- c("region", "district", "township", "date", "radiance")
 ```
 
 
-```{r LDA3}
+```{r LDA}
 # Load conflict data
 
 # Each row in the dataset represents an event linked to a conflict
@@ -184,10 +207,13 @@ colnames(nl_data) <- c("region", "district", "township", "date", "radiance")
 # Each event can last several months
 # Deaths are set by event
 
-cn_file <- paste(dr_data, "conflicts/ged201.xlsx", sep="", collapse=NULL)
+cn_file <- paste(dir_data, 
+                 "conflicts/ged201.xlsx", 
+                 sep="", 
+                 collapse=NULL)
 
 # Select columns
-cn_col_types <- c("text", # id
+cn_colTypes <- c("text", # id
                   "skip", # relid
                   "numeric", # year
                   "numeric", # active_year
@@ -239,30 +265,32 @@ cn_col_types <- c("text", # id
 
 cn <- read_xlsx(path=cn_file,
                col_names=TRUE,
-               col_types=cn_col_types,
+               col_types=cn_colTypes,
                skip=0)
+
+# from the cn data we will create three main dataframes: conflicts, events, and locations
 
 ```
 
 
-```{r CLN2}
-# select Myanmar events and clean dataset
+```{r CLN}
+# Create a dataframe of events from Myanmar
 
 # Select events by country
-cn_events <- as.data.frame(cn[which(cn$country_id==775), ])
+cn_events = as.data.frame(cn[which(cn$country_id==775), ])
 cn_events = select(cn_events, -country, -country_id)
 
 # convert to date
-cn_events$date_start <- as.Date(cn_events$date_start)
-cn_events$date_end <- as.Date(cn_events$date_end)
+cn_events$date_start = as.Date(cn_events$date_start)
+cn_events$date_end = as.Date(cn_events$date_end)
 
 # convert to boolean
-cn_events$active_year <- as.logical(cn_events$active_year)
+cn_events$active_year = as.logical(cn_events$active_year)
 
 # convert to factor
-cn_events$date_prec <- as.factor(cn_events$date_prec)
-cn_events$where_prec <- as.factor(cn_events$where_prec)
-cn_events$event_clarity <- as.factor(as.numeric(cn_events$event_clarity))
+cn_events$date_prec = as.factor(cn_events$date_prec)
+cn_events$where_prec = as.factor(cn_events$where_prec)
+cn_events$event_clarity = as.factor(as.numeric(cn_events$event_clarity))
 
 # Rename event_clarity to a more meaningful ones
 #cn_events$event_clarity[cn_events$event_clarity == 1] <- "High"
@@ -282,7 +310,7 @@ names(cn_events) <- c("id","year","active_year",
 ```
 
 
-```{r EDA1}
+```{r EDA}
 # Exploring conflicts dataset
 
 # Explore deaths
@@ -308,39 +336,66 @@ ggplot(cn_explore, aes(x=year, fill=event_prec)) +
 ```
 
 
-```{r LDA3}
+```{r PRP}
+# Create a dataframe with locations of conflicts
+
+# A location can have more than one event
+
+cn_locations = cn_events %>%
+  group_by(c("longitude","latitude")) %>%
+  mutate(n_events=count())
+
+
+
+
+```
+
+
+```{r LDA}
 # Load geographical data
 
 # Country level
-mm_file <- paste(dr_data, "geo/gadm36_MMR_0_sp.rds", sep="")
-co_geo <- readRDS(mm_file)
+geo_file <- paste(dir_data, "geo/gadm36_MMR_0_sp.rds", sep="")
+co_geo <- readRDS(geo_file)
 
-# State level
-mm_file <- paste(dr_data, "geo/gadm36_MMR_1_sp.rds", sep="")
-st_geo <- readRDS(mm_file)
+# Region/State level
+geo_file <- paste(dir_data, "geo/gadm36_MMR_1_sp.rds", sep="")
+rg_geo <- readRDS(geo_file)
 
 # District level
-mm_file <- paste(dr_data, "geo/gadm36_MMR_2_sp.rds", sep="")
-ds_geo <- readRDS(mm_file)
+geo_file <- paste(dir_data, "geo/gadm36_MMR_2_sp.rds", sep="")
+ds_geo <- readRDS(geo_file)
 
 # Township level
-mm_file <- paste(dr_data, "geo/gadm36_MMR_3_sp.rds", sep="")
-tw_geo <- readRDS(mm_file)
+geo_file <- paste(dir_data, "geo/gadm36_MMR_3_sp.rds", sep="")
+tw_geo <- readRDS(geo_file)
+
+# MIMU Township level
+#geo_file <- "E:/Data Lights/Data/geo/mmr_polbnda_250k_adm3_mimu/mmr_polbnda_250k_adm3_mimu.shp"
+#tw_geo_MIMU <- st_read(geo_file)
 
 
 ```
 
 
-```{r PRP4}
+```{r PRP}
 # Create variables for the geographical data
 
-#create a list of regions and states
-st_list = as.list(st_geo@data$NAME_1)
+# create a list of regions and states
+rg_list = as.list(rg_geo@data$NAME_1)
+
+# There are 2 townships with the same name in the same Region, so we will use for the Maubin region
+# township the name that appears in the VARNAME_3 column: "Danuphyu".
+tw_geo@data$NAME_3[tw_geo@data$NAME_2=="Maubin" & tw_geo@data$NAME_3=="Danubyu"] <- "Danuphyu"
+
+# create a list of regions and townships
+tw_list = tw_geo@data[,c(4,7,10)]
+tw_list <- cbind(id=rownames(tw_list), tw_list)
 
 ```
 
 
-```{r EDA2}
+```{r EDA}
 # Exploring geographic dataset
 
 # plot maps and coordinates
@@ -369,7 +424,7 @@ tm_layout(frame = FALSE)
 ```
 
 
-```{r PRP1}
+```{r PRP}
 # Remove points that lay of the polygons (outsiders) in the conflicts dataset
 
 # create events spatialpolygon with geographical points 
@@ -378,29 +433,35 @@ coordinates(cn_temp) <- ~cn_events.longitude+cn_events.latitude
 proj4string(cn_temp) <- proj4string(tw_geo)
 
 # get the numeric index row of outsiders 
-outsiders = over(cn_temp, tw_geo)
-outsiders = rownames(outsiders[is.na(outsiders$GID_0),])
-outsiders = as.numeric(outsiders)
+cn_events_outsiders = over(cn_temp, tw_geo)
+cn_events_outsiders = rownames(cn_events_outsiders[is.na(cn_events_outsiders$GID_0),])
+cn_events_outsiders = as.numeric(cn_events_outsiders)
 
 # remove the outsiders from the conflict dataset
 cn_events = cn_events %>% 
-      filter(!row_number() %in% outsiders)
+      filter(!row_number() %in% cn_events_outsiders)
 
 # remove the outsiders from the cn_events dataset (creating it again)
 cn_temp <- data.frame(cn_events$longitude,cn_events$latitude)
 coordinates(cn_temp) <- ~cn_events.longitude+cn_events.latitude
 proj4string(cn_temp) <- proj4string(tw_geo)
 
-# plot the map and coordinates
-{plot(st_geo, col = 'lightgrey', border = 'darkgrey')
-points(cn_events$longitude, cn_events$latitude, col="red", cex=1)}
-
 # improvement: we may want to include the points that are in the border of the administrative divisions
 
 ```
 
 
-```{r PRP2}
+```{r EDA}
+
+# plot the map and coordinates
+{plot(st_geo, col = 'lightgrey', border = 'darkgrey')
+points(cn_events$longitude, cn_events$latitude, col="red", cex=1)}
+
+
+```
+
+
+```{r PRP}
 # Attach the administrative divisions names to the events dataframe
 
 cn_temp$NAME_1 = over(cn_temp, tw_geo)$NAME_1
@@ -412,28 +473,38 @@ cn_temp$NAME_3 = over(cn_temp, tw_geo)$NAME_3
 
 # convert spatialpointsdataframe to dataframe
 cn_temp <-  as.data.frame(cn_temp)
-names(cn_temp) <- c("NAME_1","NAME_2","NAME_3","longitude","latitude")
+names(cn_temp) <- c("region","district","township","longitude","latitude")
 
 # bind the administrative divisions name to the conflicts dataset
-NAME_1 <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
+region <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
                               cn_events$latitude == cn_temp$latitude, 
-                                cn_temp$NAME_1 , ""))
+                                cn_temp$region, ""))
 
-NAME_2 <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
+district <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
                               cn_events$latitude == cn_temp$latitude, 
-                                cn_temp$NAME_2 , ""))
+                                cn_temp$district, ""))
 
-NAME_3 <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
+township <- with(cn_events, ifelse(cn_events$longitude == cn_temp$longitude & 
                               cn_events$latitude == cn_temp$latitude, 
-                                cn_temp$NAME_3 , ""))
+                                cn_temp$township, ""))
 
-# Attach the administrative name to the conflicts data
-cn_events <- cbind(cn_events, NAME_1)
-cn_events <- cbind(cn_events, NAME_2)
-cn_events <- cbind(cn_events, NAME_3)
+cn_events <- cbind(cn_events, region)
+cn_events <- cbind(cn_events, district)
+cn_events <- cbind(cn_events, township)
+
+# delete variables that we don't need anymore
+region <- NULL
+district <- NULL
+township <- NULL
+
+```
+
+
+```{r EDA}
 
 # plot those that fall in a specific state
-filter <- cn_events[ which(cn_events$NAME_1=="Kachin"), ]
+filter <- cn_events[ which(cn_events$region=="Kachin"), ]
+
 {plot(st_geo, col = 'lightgrey', border = 'darkgrey')
 points(filter$longitude, filter$latitude, col="red", cex=1)}
 
@@ -442,7 +513,6 @@ points(filter$longitude, filter$latitude, col="red", cex=1)}
 
 
 ```{r EDA}
-# Explore conflicts dataset
 
 # events by type and state
 cn_explore = cn_events[c("year", "type_of_violence", "NAME_1")]
@@ -458,15 +528,14 @@ ggplot(cn_explore, aes(x=n, fill=type_of_violence, color=type_of_violence)) +
 ```
 
 
-```{r PRP3}
-# Classify events by the impacts in deaths from the conflict dataset: choose number of clusters
+```{r PRP}
+# Classify events by its severity in deaths
 
-# Impact of event is measured by these 2 variables: number of civilians deaths, and number of total deaths
-cn_stand <- cn_events %>% select(24,26)
+# Severity of event is measured by these 2 variables: number of civilians deaths, and number of total deaths
 
 # Standardize the data to make variables comparable 
 # (no need as they are already comparable, i.e., they are both deaths)
-cn_stand <- scale(cn_stand)
+cn_events_standarized <- scale(cn_events[c(24,26)])
 
 #set.seed(123)
 
@@ -491,47 +560,49 @@ cn_stand <- scale(cn_stand)
 ```
 
 
-```{r PRP4}
+```{r PRP}
 # Classify events by the impacts in deaths from the conflict dataset
 
 # this number is selected based on the previous results
-cn_clusters = 4
+cn_events_clusters = 4
 
 # Calculate and assign the clusters to the cn_events dataset (check the size and centers of kmeans output)
-cn_events$impact <- kmeans(cn_stand, cn_clusters, nstart=100)$cluster
+cn_events$severity <- kmeans(cn_events_standarized, cn_events_clusters, nstart=100)$cluster
 
 # Ordered factor, and rename impact levels to a more meaningful ones
-cn_events$impact_level = factor(cn_events$impact,labels = c("Low","Medium","High","Extreme"), ordered = TRUE)
+cn_events$severity_level = factor(cn_events$severity,
+                                  labels = c("Low","Medium","High","Extreme"), 
+                                  ordered = TRUE)
 
 ```
 
 
-```{r PRP2}
+```{r PRP}
 # Create a dataframe with information at conflicts level
 
 # Get unique conflicts by region
-cn_conflicts <- unique(cn_events[c("conflict_id","conflict_name","NAME_1")])
-cn_conflicts_list <- unique(cn_events[c("conflict_id","conflict_name")])
+cn_conflicts <- unique(cn_events[c("conflict_id", "conflict_name", "region")])
+cn_conflicts_list <- unique(cn_events[c("conflict_id", "conflict_name")])
 
 # Calculating the first and last date by conflict_id
 for (i in 1:nrow(cn_conflicts_list)) {
 
   # Select events by conflict id 
-  selected = cn_events %>% filter(conflict_id == cn_conflicts_list[i, 1])
+  cn_temp = cn_events %>% filter(conflict_id == cn_conflicts_list[i, 1])
   
   # Calculate the length
-  start = min(selected$date_start)
-  end = max(selected$date_start)
-  length = as.numeric(difftime(end, start, units="days"))
+  parameter_start = min(cn_temp$date_start)
+  parameter_end = max(cn_temp$date_start)
+  parameter_length = as.numeric(difftime(parameter_end, parameter_start, units="days"))
   
   # assign the start, end and length to each conflict-region row
   for (j in 1:nrow(cn_conflicts)) {
 
     # assign the data to the conflicts
     if (cn_conflicts[j,1] == cn_conflicts_list[i,1]) {
-      cn_conflicts[j,"start"] = start
-      cn_conflicts[j,"end"] = end
-      cn_conflicts[j,"length"] = length
+      cn_conflicts[j,"start"] = parameter_start
+      cn_conflicts[j,"end"] = parameter_end
+      cn_conflicts[j,"length"] = parameter_length
     }
     
   }
@@ -541,40 +612,31 @@ for (i in 1:nrow(cn_conflicts_list)) {
 ```
 
 
+```{r PRP}
+# Add to the events dataframe the length in years of each event
 
-```{r PRP2}
-# Create a dataset with severity and length of the events
+# Initialize column with the length
+cn_events$date_length = 0
 
-# Subset the events dataframe
-columns <- c("id", "type_of_violence", "conflict_id", "date_start", "date_end", "deaths_civilians", "deaths_total", "NAME_1", "NAME_3", "impact_level")
-cn_events_explore = cn_events[columns]
-
-# Add a column with the length
-cn_events_explore$length = 0
-for (i in 1:nrow(cn_events_explore)) {
+for (i in 1:nrow(cn_events)) {
   
-  start = as.Date(cn_events_explore[i, 4])
-  end = as.Date(cn_events_explore[i, 5])
+  parameter_start = as.Date(cn_events[i, 20])
+  parameter_end = as.Date(cn_events[i, 21])
   
-  cn_events_explore[i, 11] = 
-    round(as.numeric(difftime(end, start, unit="weeks"))/52.25,digits = 2)
+  cn_events[i, 34] = 
+    round(as.numeric(difftime(parameter_end, parameter_start, unit="weeks"))/52.25, digits = 2)
 
 }
-
-# reorganize the columns
-col_order <- c("NAME_1", "NAME_3", "conflict_id", "id", 
-               "date_start", "date_end", "length",
-               "deaths_civilians", "deaths_total", "impact_level")
-cn_events_explore <- cn_events_explore[, col_order]
 
 ```
 
 
-```{r EXP2}
-# Creating the exploring viz from previous dataframe
+```{r EDA}
+# Visualizing the exploring viz from previous dataframe
 
 parameter_region = "Kachin"
 parameter_date = as.Date("2012-04-01")
+
 cn_explore = cn_events_explore[cn_events_explore$NAME_1==parameter_region,]
 
 cn_explore = cn_explore %>%
@@ -610,7 +672,7 @@ ggplot(cn_explore) +
 ```
 
 
-```{r PRP2}
+```{r PRP}
 # Create a dataset with monthly deaths by region from the conflict dataset
 
 # Split the months from the conflicts dataset (in the new columns start_dates and end_dates)
@@ -621,66 +683,11 @@ cn_events_monthly <- cn_events %>%
 # Add a column with the month
 cn_events_monthly$month = month(cn_events_monthly$start_dates)
 
-# Finding intermediate events by month, showing number, deaths, accumulated deaths, duration, and accumulated duration
-
-# create a dataframe with the months that there are events
-cn = as.data.frame(setDT(cn_conflict)[, .(date = seq(cn_start, cn_end, by = "month")), by = conflict_id])
-
-# fill up the dataframe with the months without events
-complete(cn, conflict_id, date)
-
-# initialize variables
-cn$region
-cn$conflict
-cn$events = 0 # number of events active in the month
-cn$events_accumulated = 0 # number of events accumulated
-cn$deaths_event = 0 # deaths accumulated at the end of the event
-cn$deaths_accumulated = 0 # deaths accumulated having into account all the events before the date 
-cn$radiance
-cn$population
-cn$events_population
-cn$deaths_population
-
-# two strings of data: 
-# months when there is an event active
-# deaths at the end of the event
-
-# attach deaths and accumulated deaths
-# we assign the deaths to the year/month when the event ended (date_end)
-d_acum <- 0
-e_acum <- 0
-
-for (i in 1:nrow(cn_conflict)) {
-  
-  # get the date of the month in the conflict
-  s_month = month(cn_conflict[i, date_end])
-  s_year = cn_conflict[i, year]
-  s_date = as.Date(paste(s_year, "-", s_month, "-01", sep=""))
-
-  # update the number of events
-  cn <- within(cn, events[date == s_date] <- events[date == s_date] + 1) # number of events in the month
-  cn <- within(cn, events_accumulated[date == s_date] <- events[date == s_date] + e_acum) # number of events accumulated
-  
-  # update the number of accumulated events
-  e_acum <- e_acum + cn[cn$date == s_date, 3]
-  
-  if (cn_conflict[i, deaths_total] != 0) {
-    
-    # find the row with the date and update it
-    cn <- within(cn, deaths_event[date == s_date] <- cn_conflict[i, deaths_total]) # deaths in the event
-    cn <- within(cn, deaths_accumulated[date == s_date] <- cn_conflict[i, deaths_total] + d_acum) # deaths accumulated
-    
-    # update the accumulated deaths
-    d_acum = d_acum + cn_conflict[i, deaths_total]
-    
-  }
-  
-}
 
 ```
 
 
-```{r EDA1}
+```{r EDA}
 # Plotting monthly conflicts by state
 
 parameter_region = "Kachin"
@@ -714,24 +721,19 @@ tm_layout(frame=FALSE)
 ```
 
 
-```{r PRP1}
-# create a spatial dataframe with the coordinates of the events
+```{r EDA}
+# Plotting conflicts by impact and region
 
 cn_events_geo = cn_events
 coordinates(cn_events_geo) <- ~longitude+latitude
 
-```
-
-
-```{r EDA1}
-# Plotting conflicts by impact and region
 
 # Select parameters: state and date
 parameter_region = "Kachin"
 
 st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
 tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
-cn_layer = cn_events_geo[cn_events_geo@data$NAME_1==parameter_region,]
+cn_layer = cn_events_geo[cn_events_geo@data$region==parameter_region,]
 
 tm_shape(st_layer) +
     tm_borders(col="black", lwd=1) +
@@ -752,18 +754,18 @@ tm_layout(frame=FALSE)
 
 
 ```{r PRP12}
-# Create information and geographical layers
+# Create events, nightlights, and geographical layers
 
 # Select parameters: region and date
 parameter_region = "Kachin"
 parameter_date = "2018-05-01"
 
 # Select the region and township geographical divisions
-st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
+rg_layer = rg_geo[rg_geo@data$NAME_1==parameter_region,]
 tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
 
 # Subset the events on the region
-ev_filter = cn_events_monthly[which(cn_events_monthly$NAME_1==parameter_region), ]
+ev_filter = cn_events_monthly[which(cn_events_monthly$region==parameter_region), ]
 # 282 obs > 96 obs: 1 loc can have more than 1 event as we have spitted them by month
 # Subset the events on the date
 ev_filter = ev_filter[which(ev_filter$month==month(parameter_date) & ev_filter$year==year(parameter_date)), ]
@@ -772,7 +774,7 @@ tw_filter = tw_geo[which(tw_geo@data$NAME_1==parameter_region),]
 nl_filter = nl_data[which(nl_data$region==parameter_region),]
 
 # select events information outputs 
-ev_layer = ev_filter[c("id", "latitude", "longitude", "deaths_high", "impact")]
+ev_layer = ev_filter[c("id", "latitude", "longitude", "deaths_high", "severity")]
 # Create a spatial points object
 coordinates(ev_layer) <- ~longitude+latitude
 
@@ -832,22 +834,23 @@ nl_changes <- data.frame(region=character(),
                          township=character(),
                          first=double(),
                          last=double(),
-                         stringsAsFactors=FALSE) 
+                         stringsAsFactors=FALSE)
 
 # Calculate changes from first NL reading to last NL reading
-date_first <- as.Date(min(nl_data$date))
-date_last <- as.Date(max(nl_data$date))
+parameter_start <- as.Date(min(nl_data$date))
+parameter_end <- as.Date(max(nl_data$date))
+
 # Changes are normalized by year (like we do with  %  of interest of money):
 # the readings change will be divided by the years between the first and last date
-date_years <- as.numeric(difftime(date_last, date_first, unit="weeks"))/52.25
+parameter_date_years <- as.numeric(difftime(parameter_end, parameter_start, unit="weeks"))/52.25
 
-for (i in 1:length(st_list)) {
+for (i in 1:length(rg_list)) {
   
-  nl_temp = nl_data[which(nl_data$region==st_list[[i]]), ]
-  nl_temp = nl_temp[(nl_temp$date==date_first | nl_temp$date==date_last),]
+  nl_temp = nl_data[which(nl_data$region==rg_list[[i]]), ]
+  nl_temp = nl_temp[(nl_temp$date==parameter_start | nl_temp$date==parameter_end),]
   nl_temp = cast(nl_temp, region+district+township~date, mean, value = "radiance")
   names(nl_temp) = c("region", "district", "township", "first", "last")
-  nl_temp$change = nl_temp$last/nl_temp$first/date_years
+  nl_temp$change = nl_temp$last/nl_temp$first/parameter_date_years
 
   # assign levels
   nl_temp = nl_temp %>% 
@@ -904,8 +907,514 @@ tm_layout(frame = FALSE)
 ```
 
 
-```{r PRP4}
-# Export files for web app
+
+```{r LDA}
+# Load population data from the census
+
+pp_file <- paste(dir_data,
+                 "population/BaselineData_Census_Dataset_SR_District_Township_MIMU_16Jun2016_ENG.xlsx", 
+                 sep="", 
+                 collapse=NULL)
+
+# Select columns
+pp_colTypes <- c("text", # State/Region Pcode
+                  "text", # State/Region name
+                  "text", # District Pcode
+                  "text", # District Name
+                  "text", # Township Pcode
+                  "text", # Township Name
+                  "numeric", # Population total
+                  "skip", # Population male
+                  "skip", # Population female
+                  "skip", # Population sex ratio
+                  "skip", # Population total urban
+                  "skip", # Population male urban
+                  "skip", # Population female urban
+                  "skip", # Population sex ratio urban
+                  "skip", # Population total rural
+                  "skip", # Population male rural
+                  "skip", # Population female rural
+                  "skip", # Population sex ratio rural
+                  "skip") # Urban Population %
+
+pp <- read_xlsx(path=pp_file,
+                 sheet = "Table A-3",
+                 col_names=TRUE,
+                 col_types=pp_colTypes,
+                 skip=4)
+
+
+```
+
+
+```{r CLN}
+# Population dataset cleaning
+
+# change columns names
+pp_data = pp %>% select(2,4,6,7)
+names(pp_data) = c("region", "district", "township", "population")
+
+# remove NAs (population aggregated at regional level)
+pp_data = pp_data[complete.cases(pp_data),]
+
+sum(pp_data$population, na.rm=TRUE)
+#50,279,900
+
+```
+
+
+```{r LDA, eval=FALSE}
+# Load the file with the mapping of township names from GADM and from census data
+
+# Select columns
+pp_colTypes <- c("numeric", # GADM code
+                  "text", # State/Region name
+                  "text", # Township Name
+                  "numeric", # Census code
+                  "text", # State/Region name
+                  "text", # township name
+                  "text", # Strategy
+                  "numeric", # Target
+                  "skip") # Notes
+
+pp_file = paste(dir_data,
+                "population/2014 Census Administrative Differences.xlsx",
+                sep="",
+                collapse=NULL)
+
+tw_mapping <- read_xlsx(path=pp_file,
+                 sheet = "Mapping",
+                 col_names=TRUE,
+                 col_types=pp_colTypes,
+                 skip=2)
+
+# create a temp tables with the ids to link the population
+pp_table = pp_data
+pp_table$id = rownames(pp_table)
+
+
+```
+
+
+
+```{r PRP}
+# Create a dataframe to store the predictions
+
+# use nl data structure
+md_df_pp = nl_data
+
+#attach the area
+md_df_pp = merge(x=md_df_pp, 
+                 y=nl[,c("division_.yin.","district_.kayaing.","village.township","area_sq_km")],
+                 by=c("region","district","township"),
+                 by.y=c("division_.yin.","district_.kayaing.","village.township"),
+                 all.x=TRUE)
+colnames(md_df_pp)[6] <- "area"
+
+#split the date
+md_df_pp$month = month(md_df_pp$date)
+md_df_pp$year = year(md_df_pp$date)
+md_df_pp$date = NULL
+#order by date
+md_df_pp = md_df_pp[order(md_df_pp$year, md_df_pp$month),]
+
+cn_temp = cn_events
+cn_temp$month = month(cn_temp$date_start)
+cn_temp = cn_temp[order(cn_temp$year, cn_temp$month),]
+
+# add the new columns
+md_df_pp$n_events = 0
+md_df_pp$c_deaths = 0
+md_df_pp$t_deaths = 0
+md_df_pp$population = 0
+
+for (i in 1:nrow(md_df_pp)){
+  
+  # calculate the NUMBER OF EVENTS by township and date
+  # (update with district to catch duplicated townships)
+  md_df_pp[i, 8] = cn_temp %>%
+    filter(region == md_df_pp[i,1] &
+           township == md_df_pp[i,3] &
+           month == md_df_pp[i,6] &
+           year == md_df_pp[i,7]) %>%
+    count()
+
+  # calculate the number of CIVILIAN DEATHS by township and date
+  # (update with district to catch duplicated townships)
+  md_df_pp[i, 9] = cn_temp %>%
+    filter(region == md_df_pp[i,1] &
+           township == md_df_pp[i,3] &
+           month == md_df_pp[i,6] &
+           year == md_df_pp[i,7]) %>%
+    summarise(d = sum(deaths_civilians))
+
+
+  # calculate the number of TOTAL DEATHS by township and date
+  # (update with district to catch duplicated townships)
+  md_df_pp[i, 10] = cn_temp %>%
+    filter(region == md_df_pp[i,1] &
+           township == md_df_pp[i,3] &
+           month == md_df_pp[i,6] &
+           year == md_df_pp[i,7]) %>%
+    summarise(d = sum(deaths_total))
+
+}
+
+
+sum(md_df_pp$n_events, na.rm=TRUE)
+#735 (2,757 counting before Apr/2012)
+
+sum(md_df_pp$t_deaths, na.rm=TRUE)
+#5,239
+
+# re-organize the columns
+col_order <- c("region", "district", "township", "area",
+               "month", "year", 
+               "n_events", "c_deaths", "t_deaths",
+               "radiance", "population")
+md_df_pp <- md_df_pp[,col_order]
+
+# backup the data
+md_df_pp_backup <- md_df_pp
+# restore the data
+md_df_pp <- md_df_pp_backup
+
+```
+
+
+```{r CLN}
+# Assign the same names from GADM to the population data
+
+# The census was collected between 30 March and 10 April 2014
+parameter_date = as.Date("2014-04-01")
+
+# The census data has been collected using different geographical divisions than the ones in GADM,
+# so we need to adjust them to fit census to GADM distribution.
+# There will be 4 different strategies to match the data from the census with GADM:
+
+# 1) Direct transfer, when the divisions match in both census and GADM
+# 2) Merge with GADM, when one division in the census is completely inside another region of GADM
+# 3) Split to GADM, when a division in the census doesn't exist in GADM
+# 4) Split from census, when a division in GADM doesn't exist in the census
+
+```
+
+
+```{r CLN}
+# Assign the same names from GADM to the population data
+# 1) Direct transfer, when the townships match in both census and GADM
+
+# Select the townships we are going to transfer
+tw_mapping_selected = tw_mapping[tw_mapping$Strategy == "Direct Transfer",]
+
+# add population to mapping from the pop_table
+tw_mapping_selected = merge(tw_mapping_selected, pp_table, by.x="census", by.y="id")
+
+for (i in 1:nrow(md_df_pp)){
+
+    # control that is the period from the census
+    if ((as.numeric(md_df_pp[i,5]) == as.numeric(month(parameter_date))) &&
+        (as.numeric(md_df_pp[i,6]) == as.numeric(year(parameter_date)))) {
+      
+        md_df_pp[i,11] = 
+            tw_mapping_selected %>%
+            filter(
+              NAME_1 == md_df_pp[i,1] &
+              NAME_3 == md_df_pp[i,3]) %>%
+            summarise(p = sum(population))
+    } 
+}
+
+sum(md_df_pp$population, na.rm=TRUE)
+# 41,592,810
+
+```
+
+
+```{r CLN}
+# Assign the same names from GADM to the population data
+
+# 2) Merge with GADM, when one division in the census is completely inside another region of GADM
+
+# Select the townships we are going to transfer, those that start with "merge with"
+tw_mapping_selected = subset(tw_mapping, grepl("Merge with", Strategy))
+
+# add region and township to mapping from the tw_list
+tw_mapping_selected = merge(tw_mapping_selected, tw_list, by.x="Target", by.y="id")
+
+# add population to mapping from the pp_table
+tw_mapping_selected = merge(tw_mapping_selected, pp_table, by.x="census", by.y="id")
+
+# Top up the population
+for (i in 1:nrow(tw_mapping_selected)){
+    
+    # find the record in the md_df_pp
+    for (j in 1:nrow(md_df_pp)){
+      
+      if (
+          (as.numeric(md_df_pp[j,5]) == as.numeric(month(parameter_date))) &&
+          (as.numeric(md_df_pp[j,6]) == as.numeric(year(parameter_date))) &&
+          (md_df_pp[j,1] == tw_mapping_selected[i,9]) &&
+          (md_df_pp[j,3] == tw_mapping_selected[i,11])){
+  
+            md_df_pp[j,11] = md_df_pp[j,11] + tw_mapping_selected[i,15]
+            break
+      }
+    }
+}
+
+sum(md_df_pp$population, na.rm=TRUE)
+#49,145,022
+
+```
+
+
+```{r CLN}
+# Assign the same names from GADM to the population data
+
+# 3) Split to GADM, when a division in the census doesn't exist in GADM
+# 4) Split from census, when a division in GADM doesn't exist in the census
+
+# There are only 5 cases here, so we do it manually
+tw_mapping_selected <- subset(tw_mapping, grepl("Split to", Strategy))
+
+# add population to mapping from the pop_table
+tw_mapping_selected = merge(tw_mapping_selected, pp_table, by.x="census", by.y="id")
+
+# case 1: Myinmu to ADD Myinmu (50%) and ADD to Ngazun (50%)
+md_df_pp[which(md_df_pp$region=="Sagaing" &
+                          md_df_pp$township == "Myinmu" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[1,12]*0.5)
+
+md_df_pp[which(md_df_pp$region=="Sagaing" &
+                          md_df_pp$township == "Ngazun" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[1,12]*0.5)
+
+# case 2: Kanbalu ADD to Kanbalu (80%) and ADD to Tantabin (20%)
+md_df_pp[which(md_df_pp$region=="Sagaing" &
+                          md_df_pp$township == "Kanbalu" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[2,12]*0.8)
+
+md_df_pp[which(md_df_pp$region=="Sagaing" &
+                          md_df_pp$township == "Tantabin" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[2,12]*0.2)
+
+# case 3: Kangyidaunt TOP UP to Bassein West (40%) and TOP UP to Ngaputaw (60%)
+# store the current population for Bassein West
+pp_base <- md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Bassein West" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11]
+
+md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Bassein West" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- pp_base + round(tw_mapping_selected[3,12]*0.4)
+
+# store the current population for Ngaputaw
+pp_base <- md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Ngaputaw" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11]
+
+md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Ngaputaw" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- pp_base + round(tw_mapping_selected[3,12]*0.6)
+
+# case 4: Nyaungdon ADD to Yandoon (60%) and ADD to Irrawaddy (40%)
+md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Yandoon" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[4,12]*0.6)
+
+md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Irrawaddy" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[4,12]*0.4)
+
+# case 5: Hinthada ADD to Henzada (50%) and to Danubyu (50%)
+md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Henzada" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[5,12]*0.5)
+
+md_df_pp[which(md_df_pp$region=="Ayeyarwady" &
+                          md_df_pp$township == "Danubyu" &
+                          md_df_pp$month == 4 &
+                          md_df_pp$year == 2014), 11] <- round(tw_mapping_selected[5,12]*0.5)
+
+sum(md_df_pp$population, na.rm=TRUE)
+#50,279,900
+
+```
+
+
+```{r MOD}
+# Create a model that predicts people movs from radiance and conflict data
+
+# Cannot predict future movements of people as we dont have the deaths neither rads preds,
+# so what we can do is predict past human movements, beinG population the variable to predict,
+# not radiance as we thought, at least by now....
+
+# we can estimate the correlation between radiance and population
+
+# https://srnghn.medium.com/machine-learning-trying-to-predict-a-numerical-value-8aafb9ad4d36
+
+
+# backup the df
+md_df_pp_backup <- md_df_pp 
+
+```
+
+
+```{r MOD}
+# Linear Regression
+
+#http://r-statistics.co/Linear-Regression.html
+#http://r-statistics.co/adv-regression-models.html
+
+set.seed(100)
+
+# Select observations where we have population to train the model
+md_df <- md_df_pp[md_df_pp$population>0,]
+
+# Create training and test data
+md_rowIndex <- sample(1:nrow(md_df), 0.8*nrow(md_df)) # row indices for training data
+md_df_training <- md_df[md_rowIndex, ] # model training data
+md_df_testing  <- md_df[-md_rowIndex, ] # test data
+
+# Build the model on training dataset
+md_lm <- lm(population ~ radiance+area, data=md_df_training)
+
+# Evaluate the model
+summary(md_lm)
+AIC(md_lm)
+
+# Generate the predictions of population on test dataset
+predictions <- predict(md_lm, md_df_testing)
+
+# Attach previous predictions to the test dataset
+md_df_preds <- data.frame(cbind(actual=md_df_testing$population, predicted=predictions))
+
+# Evaluate the predictions
+md_lm_corrAccuracy <- cor(md_df_preds)
+md_min_max_accuracy <- mean(apply(md_df_preds, 1, min) / apply(md_df_preds, 1, max))  
+md_mape <- mean(abs((md_df_preds$predicted - md_df_preds$actual))/md_df_preds$actual)  
+
+# k-Fold cross validation
+library(DAAG)
+cvResults <- suppressWarnings(CVlm(md_df, 
+                                   form.lm=population ~ n_events+c_deaths+t_deaths+radiance, 
+                                   m=5, 
+                                   dots=FALSE, 
+                                   seed=29, 
+                                   legend.pos="topleft",  
+                                   printit=FALSE, 
+                                   main="Small symbols are predicted values while bigger ones are actuals")); 
+
+# performs the CV
+attr(cvResults, 'ms')  # => 251.2783 mean squared error
+
+```
+
+
+```{r MOD}
+
+# K-Nearest Neigbours
+
+
+
+
+```
+
+
+
+```{r MOD}
+
+# Use model to predict data that we don´t know
+
+md_temp <- md_df_pp[md_df_pp$population==0,]
+predictions <- predict(md_lm, md_temp) # predict population
+
+md_df_preds <- data.frame(cbind(md_final, predictions))
+md_df_preds$population = NULL
+colnames(md_df_preds)[11] <- "population"
+md_final <- data.frame(rbind(md_df,md_df_preds))
+
+```
+
+
+```{r EDA23}
+# Ploting the prediction
+
+# https://www.r-graph-gallery.com/283-the-hourly-heatmap.html
+
+
+data <- data(Trentino_hourly_T,package = "Interpol.T")
+ 
+names(h_d_t)[1:5]<- c("stationid","date","hour","temp","flag")
+df <- tbl_df(h_d_t) %>%
+  filter(stationid =="T0001")
+ 
+df <- df %>% mutate(year = year(date),
+                  month = month(date),
+                  day = day(date))
+  
+df$date<-ymd(df$date) # not necessary for plot but 
+#useful if you want to do further work with the data
+ 
+#cleanup
+rm(list=c("h_d_t","mo_bias","Tn","Tx",
+          "Th_int_list","calibration_l",
+          "calibration_shape","Tm_list"))
+ 
+ 
+#create plotting df
+df <-df %>% select(stationid,day,hour,month,year,temp)%>%
+        fill(temp) #optional - see note below
+
+
+md_temp = md_final[md_final$region == parameter_region,]
+ 
+    p <- ggplot(md_temp, aes(month, township, fill=population)) +
+          geom_tile(color="white", size=0.5) + 
+          scale_fill_viridis(name="Population", option="E") +
+          facet_grid(.~year)
+    
+    p <- p + theme(
+      panel.spacing.x=unit(0.05, "lines"), 
+      panel.spacing.y=unit(0.01, "npc"),
+      panel.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
+      plot.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
+      plot.title=element_blank(),
+      legend.position = "none",
+      axis.title.y=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank(),
+      axis.title.x=element_blank(),
+      axis.text.x=element_blank(),
+      axis.ticks.x=element_blank(),
+      strip.background = element_blank()
+      ) +
+        xlab("") + 
+        ylab("") +
+        removeGrid()
+
+    ggplotly(p)
+    
+```
+
+
+
+```{r PRP}
+# Assign the same names from GADM to the population data
+
+# Export files for the web app
 
 # Save dataframes
 cn_file = "E:/Data Lights/Shiny/cn_events.rda"
@@ -926,6 +1435,8 @@ save(nl_data, file=nl_file)
 nl_file = "E:/Data Lights/Shiny/nl_changes.rda"
 save(nl_changes, file=nl_file)
 
+md_file = "E:/Data Lights/Shiny/md_final.rda"
+save(md_final, file=md_file)
 
 ```
 

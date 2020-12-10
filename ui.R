@@ -108,9 +108,9 @@ ui <- shinyUI(fluidPage(
         top = "auto", left = "0%", bottom = "4.5%",
         width = "16%", height = "6%",
        
-        "App in development [v.18]",
+        "App in development (v.19),",
         br(),
-        "Some features may not be available",
+        "some features may not be available",
 
       ), # absolute panel - Messages
                
@@ -121,9 +121,10 @@ ui <- shinyUI(fluidPage(
         fixed = TRUE, draggable = FALSE, 
         top = 75, left = "22%", bottom = "auto",
         width = "50%", height = "85%",
-        
+
         tmapOutput("map", width = "100%", height = "100%"),
-      
+        h2("Location of the events"),
+        
       ), # absolute panel - Map
              
       # Explorations
@@ -149,8 +150,8 @@ ui <- shinyUI(fluidPage(
         ),
         
         # plot
-        h5("Severity of the events in the region", style = "text-align: center;"),
-        plotOutput("explore_plot", width = "97%", height = "65%")
+        h4("Severity of the events in the region", style = "text-align: center;"),
+        plotOutput("explore_plot", width = "97%", height = "68%")
       
       ), # absolute panel - Explorations
              
@@ -160,11 +161,12 @@ ui <- shinyUI(fluidPage(
         id = "future", class = "panel panel-default",
         fixed = TRUE, draggable = FALSE, 
         top = "auto", right = "1%", bottom = "1.6%",
-        width = "26%", height = "38%",
+        width = "26%", height = "39%",
         
         # plot
-        h5("Human movements predictions", style = "text-align: center; padding-top: 5px;")
-       
+        h4("Population change by township", style = "text-align: center; padding-top: 5px;"),
+        plotlyOutput("prediction_plot", width = "97%", height = "84%")
+        
       ), # absolute panel - Predictions
            
     ), # tabPanel - App
