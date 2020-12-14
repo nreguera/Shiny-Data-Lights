@@ -9,10 +9,11 @@
 # EDA: Explore Data
 # MOD: Model Data
 
-myPaths <- .libPaths() # get the current library paths
-myPaths <- c("E:/R/Libraries/4.0.2", myPaths[1])  # add the new path
-.libPaths(myPaths)  # reassign them
-.libPaths() # check the libraries paths
+# Set library paths
+myPaths <- .libPaths() 
+myPaths <- c("E:/R/Libraries/4.0.2", myPaths[1])
+.libPaths(myPaths)
+.libPaths()
 
 # General chunk parameters
 knitr::opts_chunk$set(message = FALSE, 
@@ -125,15 +126,15 @@ expand_dates <- function(start, end) {
 # (ISO3) country code
 ctry <- "MMR"
 
-# Download rasters (tiff) and radiance readings (csv)
+# Download rasters (tif) and radiance readings (csv)
 nl_source <- getCtryNlData(
   ctryCode = ctry, # country
   custPolyPath = "mmr_polbnda_250k_adm3_mimu.zip",
   admLevel = "0_mmr_polbnda_250k_adm3_mimu", # admin level
   nlType = "VIIRS.M", # monthly values
-  nlPeriods = nlRange("201204", "201212"),
+  nlPeriods = nlRange("201801", "201912"),
   ignoreMissing = FALSE, # not ignoring missing values
-  nlStats = list("mean", na.rm=FALSE) # aggregation: average 
+  nlStats = list("mean", na.rm=TRUE) # aggregation: average 
 )
 
 ``` 
@@ -142,7 +143,7 @@ nl_source <- getCtryNlData(
 ```{r LDA}
 # Load nightlights data
 
-nl_file <- paste(dir_data, "nl/NL_DATA_MMR_ADM3_GADM-3.6-SHPZIP.csv", sep="", collapse=NULL)
+nl_file <- "E:/Data Lights/Data/nl/NL_DATA_MMR_ADM3_GADM-3.6-SHPZIP.csv"
 
 nl <- read.csv(file=nl_file,
                header=TRUE, 
@@ -292,20 +293,59 @@ cn_events$date_prec = as.factor(cn_events$date_prec)
 cn_events$where_prec = as.factor(cn_events$where_prec)
 cn_events$event_clarity = as.factor(as.numeric(cn_events$event_clarity))
 
-# Rename event_clarity to a more meaningful ones
-#cn_events$event_clarity[cn_events$event_clarity == 1] <- "High"
-#cn_events$event_clarity[cn_events$event_clarity == 2] <- "Low"
+# Rename type_of_violence to a more meaningful ones
+cn_events$type_of_violence[cn_events$type_of_violence == 1] <- "State"
+cn_events$type_of_violence[cn_events$type_of_violence == 2] <- "No-state"
+cn_events$type_of_violence[cn_events$type_of_violence == 3] <- "1-sided"
+cn_events$type_of_violence = as.factor(cn_events$type_of_violence)
 
 # change names
 names(cn_events) <- c("id","year","active_year",
                     "type_of_violence","conflict_id","conflict_name","dyad_id","dyad_name",
                     "side_a_id","side_a_name","side_b_id","side_b_name",
-                    "sources_number",
-                    "location_prec","location_name","latitude","longitude",
-                    "event_prec","date_prec","date_start","date_end",
+                    "number_of_sources",
+                    "where_prec","location_name","latitude","longitude",
+                    "event_clarity","date_prec","date_start","date_end",
                     "deaths_side_a","deaths_side_b","deaths_civilians",
                     "deaths_unknown","deaths_total","deaths_high","deaths_low")
 
+
+```
+
+
+```{r PRP}
+# calculate overall precision of each event
+
+# To calculate it, we will use the following variables:
+
+# where_prec: from 7 (lowest) to 1 (highest). Calculation = 8-X, being X the value of the observation
+# number_of_sources: from -1 (lowest) to 44 (highest). Calculation = X+1, being X the value of the observation
+# event_clarity: from 1 (highest) to 2 (lowest). Calculation = (3-X)*3, being X the value of the observation
+# date_prec: from 1 (lowest) to 5 (highest). Calculation = 6-X, being X the value of the observation
+
+# Calculate the score of the event in terms of precision
+cn_events$event_score = (8-as.numeric(cn_events$where_prec)) + 
+  (cn_events$number_of_sources+1) +
+  ((3-as.numeric(cn_events$event_clarity))*3) +
+  (6-as.numeric(cn_events$date_prec))
+
+# check the distribution
+plot(density(cn_events$event_score))
+
+# Three levels of precision: low, medium and high
+# Low precision score: < 19
+# Medium precision score: 19-33
+# High precision score: >33
+
+# assign levels
+cn_events = cn_events %>% 
+  mutate(event_precision = case_when(
+    .$event_score < 19 ~ "Low",
+    .$event_score < 34 ~ "Medium",
+    .$event_score > 33 ~ "High",
+    TRUE ~ "NONE"
+    )
+  )
 
 ```
 
@@ -332,21 +372,6 @@ cn_explore = cn_events[c("year", "event_prec")]
 
 ggplot(cn_explore, aes(x=year, fill=event_prec)) +
   geom_histogram(colour='white', size=1)
-
-```
-
-
-```{r PRP}
-# Create a dataframe with locations of conflicts
-
-# A location can have more than one event
-
-cn_locations = cn_events %>%
-  group_by(c("longitude","latitude")) %>%
-  mutate(n_events=count())
-
-
-
 
 ```
 
@@ -425,7 +450,7 @@ tm_layout(frame = FALSE)
 
 
 ```{r PRP}
-# Remove points that lay of the polygons (outsiders) in the conflicts dataset
+# Remove points that lay of the polygons (outsiders) in the events dataframe
 
 # create events spatialpolygon with geographical points 
 cn_temp <- data.frame(cn_events$longitude,cn_events$latitude)
@@ -561,7 +586,7 @@ cn_events_standarized <- scale(cn_events[c(24,26)])
 
 
 ```{r PRP}
-# Classify events by the impacts in deaths from the conflict dataset
+# Classify events by the severity in deaths from the conflict dataset
 
 # this number is selected based on the previous results
 cn_events_clusters = 4
@@ -569,7 +594,7 @@ cn_events_clusters = 4
 # Calculate and assign the clusters to the cn_events dataset (check the size and centers of kmeans output)
 cn_events$severity <- kmeans(cn_events_standarized, cn_events_clusters, nstart=100)$cluster
 
-# Ordered factor, and rename impact levels to a more meaningful ones
+# Ordered factor, and rename severity levels to a more meaningful ones
 cn_events$severity_level = factor(cn_events$severity,
                                   labels = c("Low","Medium","High","Extreme"), 
                                   ordered = TRUE)
@@ -581,8 +606,8 @@ cn_events$severity_level = factor(cn_events$severity,
 # Create a dataframe with information at conflicts level
 
 # Get unique conflicts by region
-cn_conflicts <- unique(cn_events[c("conflict_id", "conflict_name", "region")])
-cn_conflicts_list <- unique(cn_events[c("conflict_id", "conflict_name")])
+cn_conflicts <- unique(cn_events[c("conflict_id", "conflict_name", "region", "type_of_violence")])
+cn_conflicts_list <- unique(cn_events[c("conflict_id", "conflict_name", "type_of_violence")])
 
 # Calculating the first and last date by conflict_id
 for (i in 1:nrow(cn_conflicts_list)) {
@@ -593,7 +618,7 @@ for (i in 1:nrow(cn_conflicts_list)) {
   # Calculate the length
   parameter_start = min(cn_temp$date_start)
   parameter_end = max(cn_temp$date_start)
-  parameter_length = as.numeric(difftime(parameter_end, parameter_start, units="days"))
+  parameter_length = as.numeric((difftime(parameter_end, parameter_start, units="weeks"))/52.25, digits = 2)
   
   # assign the start, end and length to each conflict-region row
   for (j in 1:nrow(cn_conflicts)) {
@@ -608,6 +633,43 @@ for (i in 1:nrow(cn_conflicts_list)) {
   }
 
 }
+
+# adding the number of events
+cn_conflicts$n_events = 0
+for (i in 1:nrow(cn_conflicts)){
+  
+  # calculate the NUMBER OF EVENTS by conflict and region
+  cn_conflicts[i, 7] = cn_events %>%
+    filter(conflict_id == cn_conflicts[i,1] &
+           region == cn_conflicts[i,3]) %>%
+    count()
+}
+
+
+
+```
+
+
+```{r PRP}
+# Create a dataframe with locations of conflicts
+
+# A location can have more than one event
+cn_locations = cn_events %>%
+  group_by(conflict_name,longitude, latitude) %>%
+  filter(event_precision == c("Medium","High")) %>%
+  summarise(n_events = n(), 
+            t_deaths = sum(deaths_total),
+            c_deaths = sum(deaths_civilians),
+            t_conflict = type_of_violence,
+            region = region)
+
+# calculate the severity in the location
+
+
+
+# convert coordinates to spatial object
+coordinates(cn_locations) <- ~longitude+latitude
+proj4string(cn_locations) <- proj4string(tw_geo)
 
 ```
 
@@ -700,7 +762,7 @@ ggplot(cn_explore, aes(start_dates, deaths_total)) + geom_line() + scale_x_date(
 geom_vline(xintercept = as.Date("01-01-2018",  format = "%d-%m-%Y"), linetype = 'dotted', color = 'blue')
 
 # Select the data we need to  draw the map
-cn_explore = cn_explore[c("id","longitude","latitude","deaths_total","impact")]
+cn_explore = cn_explore[c("id","longitude","latitude","deaths_total","severity")]
 # transform the data to spatial coordinates
 coordinates(cn_explore) <- ~longitude+latitude
 
@@ -713,7 +775,7 @@ tm_shape(st_layer) +
 tm_shape(tw_layer) +
     tm_borders(col="grey", lwd=1, lty="dashed", alpha=0.6) +
 tm_shape(cn_explore) +
-    tm_bubbles(size="deaths_total", col="impact") + 
+    tm_bubbles(size="deaths_total", col="severity") + 
 tm_legend(show=TRUE) +
 tm_layout(frame=FALSE)
 
@@ -722,7 +784,7 @@ tm_layout(frame=FALSE)
 
 
 ```{r EDA}
-# Plotting conflicts by impact and region
+# Plotting conflicts by severity and region
 
 cn_events_geo = cn_events
 coordinates(cn_events_geo) <- ~longitude+latitude
@@ -740,7 +802,7 @@ tm_shape(st_layer) +
 tm_shape(tw_layer) +
     tm_borders(col="grey", lwd=1, lty="dashed", alpha=0.6) +
 tm_shape(cn_layer) +
-  tm_bubbles(col = "impact_level",
+  tm_bubbles(col = "severity_level",
           alpha = 0.5,
           #palette = hcl.colors(6, "Tropic"), 
           palette = c("white","pink","red","black"),
@@ -789,7 +851,7 @@ nl_layer@data$radiance = nl_filter[which(nl_filter$date==parameter_date),]$radia
 ```{r EDA2}
 # Plotting monthly conflicts by region
 
-# Map of the selected region with the total_deaths and impact
+# Map of the selected region with the total_deaths and severity
 tm <- tm_shape(nl_layer) + 
   tm_fill(col = "radiance",
           n = 15,
@@ -803,7 +865,7 @@ tm_shape(tw_layer) +
 
 tm_shape(ev_layer) +
   tm_bubbles(size="deaths_high", 
-             col="impact",
+             col="severity",
              border.lwd = NA, 
              alpha = 0.9) + 
   
@@ -811,7 +873,7 @@ tm_shape(st_layer) +
     tm_borders(col="black", lwd=1) +
 
 tm_legend(show=TRUE) + 
-tm_layout("Conflicts Impact",
+tm_layout("Conflicts severity",
           legend.title.size = 1,
           legend.text.size = 0.6,
           legend.outside.position = c("left","bottom"),
@@ -1280,12 +1342,13 @@ md_df_pp_backup <- md_df_pp
 
 set.seed(100)
 
-# Select observations where we have population to train the model
+# model by township with conflicts data
+# Select observations where we have population to build the model
 md_df <- md_df_pp[md_df_pp$population>0,]
 
 # Create training and test data
-md_rowIndex <- sample(1:nrow(md_df), 0.8*nrow(md_df)) # row indices for training data
-md_df_training <- md_df[md_rowIndex, ] # model training data
+md_rowIndex <- sample(1:nrow(md_df), 0.8*nrow(md_df))
+md_df_training <- md_df[md_rowIndex, ] # training data
 md_df_testing  <- md_df[-md_rowIndex, ] # test data
 
 # Build the model on training dataset
@@ -1422,6 +1485,12 @@ save(cn_events, file=cn_file)
 
 cn_file = "E:/Data Lights/Shiny/cn_events_geo.rda"
 save(cn_events_geo, file=cn_file)
+
+cn_file = "E:/Data Lights/Shiny/cn_locations.rda"
+save(cn_locations, file=cn_file)
+
+cn_file = "E:/Data Lights/Shiny/cn_conflicts.rda"
+save(cn_conflicts, file=cn_file)
 
 cn_file = "E:/Data Lights/Shiny/cn_conflicts_list.rda"
 save(cn_conflicts_list, file=cn_file)

@@ -24,15 +24,15 @@ library(plotly)
 ### Read in data files ---------------------------------------------------------
 
 # load GADM files
-co_geo <- readRDS("gadm36_MMR_0_sp.rds")
 st_geo <- readRDS("gadm36_MMR_1_sp.rds")
-ds_geo <- readRDS("gadm36_MMR_2_sp.rds")
 tw_geo <- readRDS("gadm36_MMR_3_sp.rds")
 
 # load dataframes
+load(file="cn_conflicts.rda")
+load(file="cn_conflicts_list.rda")
 load(file="cn_events.rda")
 load(file="cn_events_geo.rda")
-load(file="cn_conflicts_list.rda")
+load(file="cn_locations.rda")
 load(file="cn_events_explore.rda")
 load(file="nl_data.rda")
 load(file="nl_changes.rda")
@@ -43,7 +43,9 @@ load(file="md_final.rda")
 
 parameter_date = as.Date("2012-04-01")
 st_layer = st_geo[st_geo@data$NAME_1=="Kachin",]
-
+changesPalette = c("#00dfff","#D6EFF6","#F2F3EC","#fdfce1","#fbf79b")
+changesLevels = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
+changesBreaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1)
 
 ### Functions to display correct UI options ------------------------------------
 

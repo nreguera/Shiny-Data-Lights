@@ -77,18 +77,28 @@ ui <- shinyUI(fluidPage(
           
         selectInput("conflict",
                     h6("Conflict name:"),
-                    choices = c("All conflicts in the region",cn_conflicts_list$conflict_name),
+                    choices = c("All conflicts in the region", cn_conflicts_list$conflict_name),
                     selected = "All conflicts in the region"),
         
-        radioGroupButtons("precision", 
-                          h6("Precision of the events:"),
-                          choices = c("Low", "Medium", "High"),
-                          selected = "Medium",
-                          size="xs",
-                          justified=TRUE,
-                          individual=FALSE),
+        sliderTextInput("precision", 
+                        h6("Precision of the events:"),
+                        choices = c("Low", "Medium", "High"),
+                        selected = c("Medium","High"),
+                        animate = FALSE, 
+                        grid = TRUE, 
+                        hide_min_max = TRUE, 
+                        from_fixed = FALSE,
+                        to_fixed = FALSE, 
+                        from_min = NULL, 
+                        from_max = NULL, 
+                        to_min = NULL,
+                        to_max = NULL, 
+                        force_edges = TRUE,
+                        width = NULL, 
+                        pre = NULL,
+                        post = NULL, 
+                        dragRange = FALSE),
         
-      
         hr(),
                  
         h5("Select the data to predict"),
@@ -108,9 +118,9 @@ ui <- shinyUI(fluidPage(
         top = "auto", left = "0%", bottom = "4.5%",
         width = "16%", height = "6%",
        
-        "App in development (v.19),",
+        "App in development (v.20),",
         br(),
-        "some features may not be available",
+        "some features may not be available"
 
       ), # absolute panel - Messages
                
@@ -121,10 +131,15 @@ ui <- shinyUI(fluidPage(
         fixed = TRUE, draggable = FALSE, 
         top = 75, left = "22%", bottom = "auto",
         width = "50%", height = "85%",
+        zindex = 100,
 
         tmapOutput("map", width = "100%", height = "100%"),
-        h2("Location of the events"),
+        h2("Radiance changes in the events locations"),
+        h4("Showing the year changes rate from Apr-1992 to Dec-2019"),
         
+        # Click township button
+        
+
       ), # absolute panel - Map
              
       # Explorations
@@ -133,7 +148,7 @@ ui <- shinyUI(fluidPage(
         id = "past", class = "panel panel-default",
         fixed = TRUE, draggable = FALSE, 
         top = 75, right = "1%", bottom = "auto",
-        width = "26%", height = "45%",
+        width = "26%", height = "44%",
       
         # KPIs
         fluidRow(
@@ -150,7 +165,7 @@ ui <- shinyUI(fluidPage(
         ),
         
         # plot
-        h4("Severity of the events in the region", style = "text-align: center;"),
+        h4("Trends and severity of the events", style = "text-align: center;"),
         plotOutput("explore_plot", width = "97%", height = "68%")
       
       ), # absolute panel - Explorations
@@ -164,10 +179,10 @@ ui <- shinyUI(fluidPage(
         width = "26%", height = "39%",
         
         # plot
-        h4("Population change by township", style = "text-align: center; padding-top: 5px;"),
+        h4("Estimated population change by township", style = "text-align: center; padding-top: 5px;"),
         plotlyOutput("prediction_plot", width = "97%", height = "84%")
         
-      ), # absolute panel - Predictions
+      ) # absolute panel - Predictions
            
     ), # tabPanel - App
 
@@ -184,7 +199,7 @@ ui <- shinyUI(fluidPage(
        includeMarkdown("Project.Rmd"),
        br()
        
-      ), # absolute panel - Text
+      ) # absolute panel - Text
 
     ), # tabPanel - Project
 
@@ -201,7 +216,7 @@ ui <- shinyUI(fluidPage(
        includeMarkdown("Data.Rmd"),
        br()
        
-      ), # absolute panel - Text
+      ) # absolute panel - Text
 
     ) # tabPanel - Data
 

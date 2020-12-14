@@ -16,7 +16,10 @@ keep_md: TRUE
 <br>
 <br>
 
-The objective of this project is to use open data to provide tools that help tackling social issues, exploring and estimating information using night lights data as a predictor of past (where data doesn't exist) and future changes.
+The objective of this project is to use open data to provide tools that help tackling social issues, through the exploration and estimation of information that uses night lights data as a predictor of past (where data doesn't exist) and future changes.
+
+<br>
+<br>
 
 *more updates soon...*
 

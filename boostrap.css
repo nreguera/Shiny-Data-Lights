@@ -24,9 +24,9 @@
 
 /* Text paragraphs */
  hr {
-  border-top: 1px solid #E1E1E1;
-  margin-bottom: 10% !important;
-  margin-top: 10% !important;
+	border-top: 1px solid #E1E1E1;
+	margin-bottom: 10% !important;
+	margin-top: 10% !important;
 }
 
 h2{
@@ -112,7 +112,7 @@ h6 {
 	margin-bottom: -2% !important;
 	height: 70% !important;
 	line-height: 70% !important;
-	min-height: 0;
+	min-height: 0.9px !important;
 }
 
 .selectize-dropdown {
@@ -122,6 +122,17 @@ h6 {
 .selectize-dropdown-content {
 	padding: 1px !important;
 	margin: 1px !important;
+}
+
+/* Slider */
+.irs {
+	margin-top: -7%;
+}
+
+.irs-from, .irs-to { 
+	display: none;
+	color: black; 
+	background: transparent 
 }
 
 /* NOTIFICATIONS */
@@ -139,8 +150,9 @@ h6 {
 /* MAP */
 
 #map{
-	border-radius: 5px !important;
+	border-radius: 10px !important;
 	position: absolute;
+	z-index: 100;
 }
   
 #map:before {
@@ -148,7 +160,7 @@ h6 {
 	content: '';
 	height: 100%;
 	width: 100%;
-	z-index: 999;
+	z-index: 100;
 }
 
 /* EXPLORE */
@@ -191,7 +203,7 @@ h6 {
 
 /* Plot */
 #past{
-	border-radius: 5px !important;
+	border-radius: 8px !important;
 	padding-top: 0.5% !important;
 	padding-left: 0.5% !important;
 	padding-right: 0.5% !important;

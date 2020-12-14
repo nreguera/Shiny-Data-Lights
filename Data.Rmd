@@ -10,20 +10,22 @@ output: html_document
 <br>
 <br>
 
-### OPEN DATA
+### Open Data
 
 <br>
 <br>
 
-Currently the tool is using the following sources of data:
+Currently the app is using the following sources of data:
 
 <br>
 
-**DMSP and OLS nightlights data**, from the Earth Observation Group, NOAA National Centers for Environmental Information (NCEI), [source](https://www.ngdc.noaa.gov/eog/download.html).
+**DMSP and OLS nightlights data**, from the Earth Observation Group, NOAA National Centers for Environmental Information (NCEI) ([source](https://www.ngdc.noaa.gov/)).
 
-**UCDP Georeferenced Event Dataset**, from the Department of Peace and Conflict Research, Uppsala University, [source](https://ucdp.uu.se/downloads/).
+**UCDP Georeferenced Event data**, from the Department of Peace and Conflict Research, Uppsala University, [source](https://ucdp.uu.se/).
 
-**Geografical administrative areas**, from GADM, [source](https://gadm.org/data.html).
+**Geographical Administrative Divisions v3.6**, from GADM, [source](https://gadm.org/).
+
+**Myanmar Census data**, from Myanmar Information Managament Unit, [source](http://themimu.info/).
 
  </center>
  
