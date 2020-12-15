@@ -29,14 +29,28 @@
 	margin-top: 10% !important;
 }
 
+h1{
+
+}
+
+
 h2{
 	font-size:14px;
 	font-weight: bold;
 	color: #000;
 	position: absolute;
-	left: 10%;
-	text-align: center;
-	background: "white";
+	margin-top: 2%;	
+	right: 2%;
+	z-index: 998;
+}
+
+h1{
+	font-size:12px;
+	font-weight: bold;
+	color: #000;
+	position: absolute;
+	margin-top: 5%;	
+	right: 2%;
 	z-index: 998;
 }
 
@@ -126,7 +140,8 @@ h6 {
 
 /* Slider */
 .irs {
-	margin-top: -7%;
+	margin-top: -6%;
+	margin-bottom: -4%;	
 }
 
 .irs-from, .irs-to { 
@@ -222,4 +237,22 @@ h6 {
 
 #prediction_plot {
 	margin: 1.5% !important;
+}
+
+/* PROJECT */
+
+#project {
+	border-radius: 8px !important;
+	text-align: center !important;
+	padding: 5% !important;
+	background-color: #FAFAFA;
+}
+
+/* DATA */
+
+#data {
+	border-radius: 8px !important;
+	text-align: center !important;
+	padding: 5% !important;
+	background-color: #FAFAFA;
 }

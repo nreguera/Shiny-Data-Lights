@@ -103,36 +103,36 @@ server <- function(input, output, session){
         # Filter by precision of the events
         if (input$precision[1] == "Low" & input$precision[2] == "Low") {
                 
-                cn_temp = cn_temp %>% filter(event_precision == "Low")
+                cn_temp = cn_temp %>% filter(precision_level == "Low")
                 
         } else {
                 
 
         if (input$precision[1] == "Medium" & input$precision[2] == "Medium") {
                 
-                cn_temp = cn_temp %>% filter(event_precision == "Medium")
+                cn_temp = cn_temp %>% filter(precision_level == "Medium")
                 
         } else {
             
             
         if (input$precision[1] == "High" & input$precision[2] == "High") {
 
-                cn_temp = cn_temp %>% filter(event_precision == "High")
+                cn_temp = cn_temp %>% filter(precision_level == "High")
         } else {
             
             
         if (input$precision[1] == "Low" & input$precision[2] == "Medium") {
                 
-                cn_temp = cn_temp %>% filter(event_precision == "Low" |
-                                                 event_precision == "Medium")
+                cn_temp = cn_temp %>% filter(precision_level == "Low" |
+                                                 precision_level == "Medium")
                 
         } else {
             
             
         if (input$precision[1] == "Medium" & input$precision[2] == "High") {
             
-            cn_temp = cn_temp %>% filter(event_precision == "Medium" |
-                                             event_precision == "High")
+            cn_temp = cn_temp %>% filter(precision_level == "Medium" |
+                                             precision_level == "High")
         }}}}}
 
         # Prepare the dataframe for analysis
@@ -156,6 +156,24 @@ server <- function(input, output, session){
         
     })
     
+    # update KPI2
+    kpi2data <- reactive ({
+        
+        return(
+            list(
+                
+                score = mean(cn_events[cn_events$region == input$region, 30]),
+                level = case_when(
+                    score < 20 ~ "Low",
+                    score < 50 ~ "Medium",
+                    TRUE ~ "High"
+                )
+                
+            )
+        )
+        
+    })
+    
     # regional borders
     st_data <- reactive({
         
@@ -166,8 +184,8 @@ server <- function(input, output, session){
     # events information
     events_data <- reactive({
         
-        events_data = cn_events_explore[cn_events_explore$NAME_1==input$region,]
-        events_data = events_data[events_data$date_start >= parameter_date,]
+        events_data = cn_events[cn_events$region==input$region,]
+        events_data = events_data[events_data$date_start >= parameter_startDate,]
         events_data = as.data.frame(events_data)
         events_data
         
@@ -239,9 +257,10 @@ server <- function(input, output, session){
             # Pipe the tmap object into tmap_leaflet() to create a leaflet widget,
             # so that we can use leaflet::hideGroup().
             #tm = tm %>% 
-            #    tmap_leaflet() %>%
-            #    leaflet::hideGroup(locations_data()) %>%
-            #   addControl(actionButton("zoomer","Reset"),position="topright")
+            #    tmap_leaflet() #%>%
+                #leaflet(options = leafletOptions(zoomControl = FALSE)) # %>%
+               #addControl(actionButton("zoomer","Reset"),position="topright")
+            
             tm
             
         } else {
@@ -311,27 +330,36 @@ server <- function(input, output, session){
 
     # KPI-1
     output$KPI1 <- renderValueBox({
-        valueBox(tags$p(paste0("High"," severity"), style = "font-size: 40%;"), 
-                 subtitle=tags$p("Score of 90 over 100", style = "font-size: 70%;"),
-                 icon = icon("skull-crossbones"), 
-                 color="red",
-                 width=4)
-    })
+
+        valueBox(tags$p(paste0("Similar"," lights"), style = "font-size: 40%;"), 
+                 subtitle=tags$p(paste0("1%", " difference"), style = "font-size: 70%;"),
+                 icon = icon("sun"), 
+                 color="aqua")   })
     
     # KPI-2
     output$KPI2 <- renderValueBox({
-        valueBox(tags$p(paste0("Similar"," lights"), style = "font-size: 40%;"), 
-                 subtitle=tags$p("15% of difference", style = "font-size: 70%;"),
-                 icon = icon("sun"), 
-                 color="blue")
+        
+        .tmp <- kpi2data()
+        x <- .tmp$level
+        y <- .tmp$score
+        
+        valueBox(tags$p(paste0(x," severity"), style = "font-size: 40%;"), 
+                 subtitle=tags$p(paste0("Scored ", round(y), " over 100"), style = "font-size: 70%;"),
+                 icon = icon("skull-crossbones"), 
+                 color="orange",
+                 width=4)
     })
     
     # Explore plot
     explore_plot <- reactive({
         
-        ggplot(data=events_data(), aes(x=date_start, y=deaths_total, group=1)) +
-            geom_point(color="red", size=2) +
-            geom_smooth(method = "lm") +
+        p <- ggplot(data=events_data(), 
+                    aes(x=date_start, y=severity_score, colour=severity_level)) +
+            geom_point(size=4, 
+                       stroke=0,
+                       shape=16,
+                       alpha=0.3) +
+            geom_smooth(method = "lm", alpha=0.2, aes(fill = severity_level)) +
             theme(
                 legend.position = "none",
                 plot.background = element_blank(),
@@ -351,7 +379,13 @@ server <- function(input, output, session){
                 axis.ticks = element_blank()
             ) +
             xlab("") +
-            ylab("") 
+            ylab("") +
+            ylim(c(0, NA)) +
+            scale_y_continuous(breaks = integer_breaks()) +
+            scale_x_date(limits = as.Date(c(parameter_startDate, parameter_endDate)) 
+        )
+            
+            p + severityScale
             
         # update KPI1
         
@@ -395,7 +429,7 @@ server <- function(input, output, session){
             axis.title.x=element_blank(),
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank(),
-            axis.text=element_text(size=10),
+            axis.text=element_text(size=5),
             strip.background = element_blank()
         ) +
             xlab("") + 
@@ -403,7 +437,8 @@ server <- function(input, output, session){
             removeGrid()
         
         ggplotly(p)
-
+    
+        
     })
     
     ### Township Click Event ---------------------------------------------------

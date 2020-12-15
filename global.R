@@ -20,6 +20,7 @@ library(lubridate) # for easy date manipulation
 library(ggExtra) # because remembering ggplot theme options is beyond me
 library(tidyr) 
 library(plotly)
+library(scales)
 
 ### Read in data files ---------------------------------------------------------
 
@@ -33,7 +34,7 @@ load(file="cn_conflicts_list.rda")
 load(file="cn_events.rda")
 load(file="cn_events_geo.rda")
 load(file="cn_locations.rda")
-load(file="cn_events_explore.rda")
+#load(file="cn_events_explore.rda")
 load(file="nl_data.rda")
 load(file="nl_changes.rda")
 load(file="md_final.rda")
@@ -41,14 +42,40 @@ load(file="md_final.rda")
 
 ### Set variables --------------------------------------------------------------
 
-parameter_date = as.Date("2012-04-01")
+parameter_startDate = as.Date("2012-01-01")
+parameter_endDate = as.Date("2019-12-31")
+
 st_layer = st_geo[st_geo@data$NAME_1=="Kachin",]
+
+# https://htmlcolorcodes.com/color-picker/
+severityPalette = c("#FF0000","#C0C0C0","#FF8C00")
+names(severityPalette) <- levels(cn_events$severity_level)
+severityScale <- scale_colour_manual(name = "severity_level",values = severityPalette)
+
 changesPalette = c("#00dfff","#D6EFF6","#F2F3EC","#fdfce1","#fbf79b")
 changesLevels = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
 changesBreaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1)
 
+score = mean(cn_events[cn_events$region == "Kachin", 30])
+level = case_when(
+  score < 20 ~ "Low",
+  score < 50 ~ "Medium",
+  TRUE ~ "High"
+)
+
 ### Functions to display correct UI options ------------------------------------
 
+# A function factory for getting integer y-axis values.
+integer_breaks <- function(n = 5, ...) {
+  
+  fxn <- function(x) {
+    breaks <- floor(pretty(x, n, ...))
+    names(breaks) <- attr(breaks, "labels")
+    breaks
+  }
+  
+  return(fxn)
+}
 
 
 

@@ -74,27 +74,7 @@ dir_data = "Data/"
 ```
 
 
-```{r SET, eval=FALSE}
-# Setup specific libraries parameters
-
-# Regional setup
-Sys.setlocale("LC_TIME", "English")
-Sys.setlocale(locale="UTF-8")
-
-# Setup to improve performance downloading data for Rnightlights
-pkgOptions(downloadMethod="aria", extractMethod="rast", numCores=4, deleteTiles=TRUE)
-
-# to know which admLevel select in the getCtryNlData function AND create the CSV structure
-searchAdmLevel(ctryCode = "MMR", 
-               custPolyPath = paste0(dir_data,
-                                     "/geo/MIMU/mmr_polbnda_250k_adm3_mimu.zip",
-                                     sep="",
-                                     collapse=NULL))
-
-```
-
-
-```{r PRP3}
+```{r SET}
 # Define a function to extract the month
 
 expand_dates <- function(start, end) {
@@ -117,6 +97,42 @@ expand_dates <- function(start, end) {
              end_dates = end_dates)
 }
 
+
+```
+
+
+```{r SET}
+# A function factory for getting integer y-axis values.
+integer_breaks <- function(n = 5, ...) {
+  
+  fxn <- function(x) {
+    breaks <- floor(pretty(x, n, ...))
+    names(breaks) <- attr(breaks, "labels")
+    breaks
+  }
+  
+  return(fxn)
+}
+```
+
+
+```{r SET, eval=FALSE}
+# Setup specific libraries parameters
+
+# Regional setup
+Sys.setlocale("LC_TIME", "English")
+Sys.setlocale(locale="UTF-8")
+
+# Setup to improve performance downloading data for Rnightlights
+pkgOptions(downloadMethod="aria", extractMethod="rast", numCores=4, deleteTiles=TRUE)
+
+# to know which admLevel select in the getCtryNlData function AND create the CSV structure
+searchAdmLevel(ctryCode = "MMR", 
+               custPolyPath = paste0(dir_data,
+                                     "/geo/MIMU/mmr_polbnda_250k_adm3_mimu.zip",
+                                     sep="",
+                                     collapse=NULL))
+
 ```
 
 
@@ -132,7 +148,7 @@ nl_source <- getCtryNlData(
   custPolyPath = "mmr_polbnda_250k_adm3_mimu.zip",
   admLevel = "0_mmr_polbnda_250k_adm3_mimu", # admin level
   nlType = "VIIRS.M", # monthly values
-  nlPeriods = nlRange("201801", "201912"),
+  nlPeriods = nlRange("201901", "202012"),
   ignoreMissing = FALSE, # not ignoring missing values
   nlStats = list("mean", na.rm=TRUE) # aggregation: average 
 )
@@ -309,8 +325,129 @@ names(cn_events) <- c("id","year","active_year",
                     "deaths_side_a","deaths_side_b","deaths_civilians",
                     "deaths_unknown","deaths_total","deaths_high","deaths_low")
 
+# convert to integer the deaths numbers
+cn_events$deaths_civilians = as.integer(cn_events$deaths_civilians)
+cn_events$deaths_side_a = as.integer(cn_events$deaths_side_a)
+cn_events$deaths_side_b = as.integer(cn_events$deaths_side_b)
+cn_events$deaths_unknown = as.integer(cn_events$deaths_unknown)
+cn_events$deaths_high = as.integer(cn_events$deaths_high)
+cn_events$deaths_low = as.integer(cn_events$deaths_low)
+cn_events$deaths_total = as.integer(cn_events$deaths_total)
+
 
 ```
+
+
+```{r PRP}
+# Add to the events dataframe the length in days of each event
+
+cn_events$length = 0
+
+for (i in 1:nrow(cn_events)) {
+  
+  cn_events[i, 29] = 
+    round(as.numeric(difftime(cn_events[i, 21], 
+                              cn_events[i, 20],
+                              unit="days")), digits = 2)
+
+}
+
+```
+
+
+```{r EDA}
+# Check distributions
+
+
+# histogram
+ggplot(cn_events, aes(x=deaths_civilians)) + 
+  geom_histogram(binwidth = 1) + 
+  scale_x_continuous(breaks = seq(0, max(cn_events$deaths_civilians), 10))
+
+# density + quantiles
+explore_density <- density(cn_events$date_length)
+explore_df <- data.frame(x=explore_density$x, y=explore_density$y)
+
+explore_probs <- c(0.1, 0.25, 0.5, 0.75, 0.9)
+explore_quantiles <- quantile(cn_events$date_length, prob=explore_probs)
+
+explore_df$quant <- factor(findInterval(explore_df$x, explore_quantiles))
+ggplot(explore_df, aes(x,y)) + 
+  geom_line() + 
+  geom_ribbon(aes(ymin=0, ymax=y, fill=quant)) + 
+  scale_x_continuous(breaks=explore_quantiles) + 
+  scale_fill_brewer(guide="none")
+
+
+
+
+```
+
+
+```{r PRP}
+# Classify events by its severity
+
+# Severity of event is measured by # of civilians deaths and # of total deaths
+# Low: No deaths.
+# Medium: Deaths without civilians.
+# High: Deaths of civilians, and maybe non-civilians.
+
+# Score system
+# Length of the event: 0 days (0 points), 1-7 days (3 points), 8-30 days (5 points), >30 days (10 points)
+# Deaths of civilians: 0 deaths (0 points), 1-10 deaths (20 points), 11-30 (30 points), > 30 deaths (40 points)
+# Deaths unknown:  0 deaths (0 points), 1-10 deaths (15 points), 11-30 (20 points), > 30 deaths (30 points)
+# Total deaths:  0 deaths (0 points), 1-10 deaths (10 points), 11-30 (15 points), > 30 deaths (20 points)
+
+# Calculate the severity of each event based on the previous system
+cn_events$severity_score = 0
+cn_events$severity_level = ""
+
+for (i in 1:nrow(cn_events)) {
+  
+  cn_scoreLength = case_when(
+    cn_events[i,29] == 0 ~ 0,
+    cn_events[i,29] < 8 ~ 3,
+    cn_events[i,29] < 31 ~ 5,
+    TRUE ~ 10
+  )
+  
+  cn_scoreCivilians = case_when(
+    cn_events[i,24] == 0 ~ 0,
+    cn_events[i,24] < 10 ~ 20,
+    cn_events[i,24] < 31 ~ 30,
+    TRUE ~ 40
+  )
+  
+  cn_scoreUnknown = case_when(
+    cn_events[i,25] == 0 ~ 0,
+    cn_events[i,25] < 10 ~ 15,
+    cn_events[i,25] < 31 ~ 20,
+    TRUE ~ 30
+  )
+  
+  cn_scoreTotal = case_when(
+    cn_events[i,26] == 0 ~ 0,
+    cn_events[i,26] < 10 ~ 10,
+    cn_events[i,26] < 31 ~ 15,
+    TRUE ~ 20
+  )
+  
+  cn_events[i, 30] = cn_scoreLength + cn_scoreCivilians + cn_scoreUnknown + cn_scoreTotal
+
+  # Assign the level of severity based on the previous score
+  cn_events[i,31] = case_when(
+    cn_events[i,30] < 20 ~ "Low",
+    cn_events[i,30] < 50 ~ "Medium",
+    TRUE ~ "High"
+  )
+
+}
+
+# Convert severity_level in an ordered factor
+cn_events$severity_level = factor(cn_events$severity_level, ordered = TRUE)
+
+```
+
 
 
 ```{r PRP}
@@ -324,28 +461,34 @@ names(cn_events) <- c("id","year","active_year",
 # date_prec: from 1 (lowest) to 5 (highest). Calculation = 6-X, being X the value of the observation
 
 # Calculate the score of the event in terms of precision
-cn_events$event_score = (8-as.numeric(cn_events$where_prec)) + 
+cn_events$precision_score = (8-as.numeric(cn_events$where_prec)) + 
   (cn_events$number_of_sources+1) +
   ((3-as.numeric(cn_events$event_clarity))*3) +
   (6-as.numeric(cn_events$date_prec))
 
-# check the distribution
-plot(density(cn_events$event_score))
-
 # Three levels of precision: low, medium and high
-# Low precision score: < 19
-# Medium precision score: 19-33
-# High precision score: >33
+# Low precision score: < 15
+# Medium precision score: 16-30
+# High precision score: >30
 
 # assign levels
 cn_events = cn_events %>% 
-  mutate(event_precision = case_when(
-    .$event_score < 19 ~ "Low",
-    .$event_score < 34 ~ "Medium",
-    .$event_score > 33 ~ "High",
-    TRUE ~ "NONE"
+  mutate(precision_level = case_when(
+    .$precision_score < 15 ~ "Low",
+    .$precision_score < 30 ~ "Medium",
+    TRUE ~ "High"
     )
   )
+
+# Convert precision_level in an ordered factor
+cn_events$precision_level = factor(cn_events$precision_level, ordered = TRUE)
+
+```
+
+
+```{r EDA}
+# check the distribution of the score
+plot(density(cn_events$event_score))
 
 ```
 
@@ -553,54 +696,6 @@ ggplot(cn_explore, aes(x=n, fill=type_of_violence, color=type_of_violence)) +
 ```
 
 
-```{r PRP}
-# Classify events by its severity in deaths
-
-# Severity of event is measured by these 2 variables: number of civilians deaths, and number of total deaths
-
-# Standardize the data to make variables comparable 
-# (no need as they are already comparable, i.e., they are both deaths)
-cn_events_standarized <- scale(cn_events[c(24,26)])
-
-#set.seed(123)
-
-# Determining the clusters using the Elbow method
-#fviz_nbclust(cn_stand, kmeans, method = "wss") +
-#   geom_vline(xintercept = 4, linetype = 2) +
-#  labs(subtitle = "Elbow method")
-
-# Determining the clusters using the Silhouette method
-#fviz_nbclust(cn_stand, kmeans, method = "silhouette")+
-#  labs(subtitle = "Silhouette method")
-
-# Determining the clusters using the GAP statistic method
-#fviz_nbclust(cn_stand, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
-#  labs(subtitle = "Gap statistic method")
-
-# Elbow = 4
-# Silhouette = 2,4
-# GAP = 1,5
-# According to these observations, it's possible to define the number of clusters in 4
-
-```
-
-
-```{r PRP}
-# Classify events by the severity in deaths from the conflict dataset
-
-# this number is selected based on the previous results
-cn_events_clusters = 4
-
-# Calculate and assign the clusters to the cn_events dataset (check the size and centers of kmeans output)
-cn_events$severity <- kmeans(cn_events_standarized, cn_events_clusters, nstart=100)$cluster
-
-# Ordered factor, and rename severity levels to a more meaningful ones
-cn_events$severity_level = factor(cn_events$severity,
-                                  labels = c("Low","Medium","High","Extreme"), 
-                                  ordered = TRUE)
-
-```
-
 
 ```{r PRP}
 # Create a dataframe with information at conflicts level
@@ -615,10 +710,10 @@ for (i in 1:nrow(cn_conflicts_list)) {
   # Select events by conflict id 
   cn_temp = cn_events %>% filter(conflict_id == cn_conflicts_list[i, 1])
   
-  # Calculate the length
+  # Calculate the length in weeks
   parameter_start = min(cn_temp$date_start)
   parameter_end = max(cn_temp$date_start)
-  parameter_length = as.numeric((difftime(parameter_end, parameter_start, units="weeks"))/52.25, digits = 2)
+  parameter_length = round(as.numeric((difftime(parameter_end, parameter_start, units="weeks"))/52.25), 2)
   
   # assign the start, end and length to each conflict-region row
   for (j in 1:nrow(cn_conflicts)) {
@@ -639,12 +734,33 @@ cn_conflicts$n_events = 0
 for (i in 1:nrow(cn_conflicts)){
   
   # calculate the NUMBER OF EVENTS by conflict and region
-  cn_conflicts[i, 7] = cn_events %>%
+  cn_conflicts[i, 8] = cn_events %>%
     filter(conflict_id == cn_conflicts[i,1] &
            region == cn_conflicts[i,3]) %>%
     count()
 }
 
+# adding severity score and level
+cn_conflicts$severity_score = 0
+for (i in 1:nrow(cn_conflicts)){
+  
+  # calculate the NUMBER OF EVENTS by conflict and region
+  cn_conflicts[i, 9] = cn_events %>%
+    filter(conflict_id == cn_conflicts[i,1]) %>%
+    summarise(mean = round(mean(severity_score)))
+}
+
+# Assign the level of severity based on the previous score
+cn_conflicts$severity_level = ""
+for (i in 1:nrow(cn_conflicts)){
+  
+  cn_conflicts[i,10] = case_when(
+    cn_conflicts[i,9] < 20 ~ "Low",
+    cn_conflicts[i,9] < 50 ~ "Medium",
+    TRUE ~ "High"
+  )
+  
+}
 
 
 ```
@@ -656,7 +772,6 @@ for (i in 1:nrow(cn_conflicts)){
 # A location can have more than one event
 cn_locations = cn_events %>%
   group_by(conflict_name,longitude, latitude) %>%
-  filter(event_precision == c("Medium","High")) %>%
   summarise(n_events = n(), 
             t_deaths = sum(deaths_total),
             c_deaths = sum(deaths_civilians),
@@ -673,24 +788,6 @@ proj4string(cn_locations) <- proj4string(tw_geo)
 
 ```
 
-
-```{r PRP}
-# Add to the events dataframe the length in years of each event
-
-# Initialize column with the length
-cn_events$date_length = 0
-
-for (i in 1:nrow(cn_events)) {
-  
-  parameter_start = as.Date(cn_events[i, 20])
-  parameter_end = as.Date(cn_events[i, 21])
-  
-  cn_events[i, 34] = 
-    round(as.numeric(difftime(parameter_end, parameter_start, unit="weeks"))/52.25, digits = 2)
-
-}
-
-```
 
 
 ```{r EDA}
@@ -1483,9 +1580,6 @@ md_temp = md_final[md_final$region == parameter_region,]
 cn_file = "E:/Data Lights/Shiny/cn_events.rda"
 save(cn_events, file=cn_file)
 
-cn_file = "E:/Data Lights/Shiny/cn_events_geo.rda"
-save(cn_events_geo, file=cn_file)
-
 cn_file = "E:/Data Lights/Shiny/cn_locations.rda"
 save(cn_locations, file=cn_file)
 
@@ -1494,9 +1588,6 @@ save(cn_conflicts, file=cn_file)
 
 cn_file = "E:/Data Lights/Shiny/cn_conflicts_list.rda"
 save(cn_conflicts_list, file=cn_file)
-
-cn_file = "E:/Data Lights/Shiny/cn_events_explore.rda"
-save(cn_events_explore, file=cn_file)
 
 nl_file = "E:/Data Lights/Shiny/nl_data.rda"
 save(nl_data, file=nl_file)

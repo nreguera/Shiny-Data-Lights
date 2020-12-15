@@ -115,10 +115,10 @@ ui <- shinyUI(fluidPage(
       
         id = "messages", class = "messages", 
         fixed = TRUE, draggable = FALSE, 
-        top = "auto", left = "0%", bottom = "4.5%",
+        top = "auto", left = "0%", bottom = "3%",
         width = "16%", height = "6%",
        
-        "App in development (v.20),",
+        "App in development (v.21),",
         br(),
         "some features may not be available"
 
@@ -135,7 +135,7 @@ ui <- shinyUI(fluidPage(
 
         tmapOutput("map", width = "100%", height = "100%"),
         h2("Radiance changes in the events locations"),
-        h4("Showing the year changes rate from Apr-1992 to Dec-2019"),
+        h1("Yearly-changes rates from Apr-1992 to Dec-2019"),
         
         # Click township button
         
@@ -165,8 +165,8 @@ ui <- shinyUI(fluidPage(
         ),
         
         # plot
-        h4("Trends and severity of the events", style = "text-align: center;"),
-        plotOutput("explore_plot", width = "97%", height = "68%")
+        h4("Severity trends of the conflict events", style = "text-align: center;"),
+        plotOutput("explore_plot", width = "100%", height = "68%")
       
       ), # absolute panel - Explorations
              
