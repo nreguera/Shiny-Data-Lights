@@ -32,12 +32,13 @@ tw_geo <- readRDS("gadm36_MMR_3_sp.rds")
 load(file="cn_conflicts.rda")
 load(file="cn_conflicts_list.rda")
 load(file="cn_events.rda")
-load(file="cn_events_geo.rda")
+#load(file="cn_events_geo.rda")
 load(file="cn_locations.rda")
 #load(file="cn_events_explore.rda")
 load(file="nl_data.rda")
 load(file="nl_changes.rda")
-load(file="md_final.rda")
+load(file="md_df_results.rda")
+load(file="pp_changes.rda")
 
 
 ### Set variables --------------------------------------------------------------
@@ -53,7 +54,8 @@ names(severityPalette) <- levels(cn_events$severity_level)
 severityScale <- scale_colour_manual(name = "severity_level",values = severityPalette)
 
 changesPalette = c("#00dfff","#D6EFF6","#F2F3EC","#fdfce1","#fbf79b")
-changesLevels = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
+names(changesPalette) = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
+changesScale <- scale_colour_manual(name = "changes_level",values = changesPalette)
 changesBreaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1)
 
 score = mean(cn_events[cn_events$region == "Kachin", 30])

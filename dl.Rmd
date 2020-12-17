@@ -57,6 +57,7 @@ library(ggExtra)
 library(tidyr) 
 
 # Model data
+library(DAAG)
 
 # Clear console
 cat("\014")
@@ -116,6 +117,60 @@ integer_breaks <- function(n = 5, ...) {
 ```
 
 
+```{r LDA}
+# Load geographical data
+
+# Country level
+geo_file <- paste(dir_data, "geo/gadm36_MMR_0_sp.rds", sep="")
+co_geo <- readRDS(geo_file)
+
+# Region/State level
+geo_file <- paste(dir_data, "geo/gadm36_MMR_1_sp.rds", sep="")
+rg_geo <- readRDS(geo_file)
+
+# District level
+geo_file <- paste(dir_data, "geo/gadm36_MMR_2_sp.rds", sep="")
+ds_geo <- readRDS(geo_file)
+
+# Township level
+geo_file <- paste(dir_data, "geo/gadm36_MMR_3_sp.rds", sep="")
+tw_geo <- readRDS(geo_file)
+
+# MIMU Township level
+#geo_file <- "E:/Data Lights/Data/geo/mmr_polbnda_250k_adm3_mimu/mmr_polbnda_250k_adm3_mimu.shp"
+#tw_geo_MIMU <- st_read(geo_file)
+
+
+```
+
+
+```{r PRP}
+# Create variables for the geographical data
+
+# create a list of regions and states
+rg_list = as.data.frame(rg_geo@data$NAME_1)
+
+# There are 2 townships with the same name in the same Region, so we will use for the Maubin region
+# township the name that appears in the VARNAME_3 column: "Danuphyu".
+tw_geo@data$NAME_3[tw_geo@data$NAME_2=="Maubin" & tw_geo@data$NAME_3=="Danubyu"] <- "Danuphyu"
+
+# create a list of regions and townships
+tw_list = tw_geo@data[,c(4,7,10)]
+tw_list <- cbind(id=rownames(tw_list), tw_list)
+
+
+```
+
+
+```{r PRP}
+# Transform the map into a simplified map
+pm = st_as_sf(provinces.map) %>%
+  rmapshaper::ms_simplify()
+names(pm)[4] <- "province"
+
+```
+
+
 ```{r SET, eval=FALSE}
 # Setup specific libraries parameters
 
@@ -148,7 +203,7 @@ nl_source <- getCtryNlData(
   custPolyPath = "mmr_polbnda_250k_adm3_mimu.zip",
   admLevel = "0_mmr_polbnda_250k_adm3_mimu", # admin level
   nlType = "VIIRS.M", # monthly values
-  nlPeriods = nlRange("201901", "202012"),
+  nlPeriods = nlRange("202006", "202012"),
   ignoreMissing = FALSE, # not ignoring missing values
   nlStats = list("mean", na.rm=TRUE) # aggregation: average 
 )
@@ -191,6 +246,21 @@ nl_data[14, 4] <- "Danuphyu"
 
 
 ```{r PRP}
+# Complete with NAs the months of 2012 where there are not observations
+
+# Easy way: adding those columns to the current data at this point, using the same name template
+#nl_name = names(nl_data)[6]
+# NL_VIIRS.M_VCMCFG.MTSALL.MEAN.RGFT_201204_mean.....na.rm.TRUE.
+
+# We need to add 3 months (3 new columns) from january to march 2012
+nl_data$NL_VIIRS.M_VCMCFG.MTSALL.MEAN.RGFT_201201_mean.....na.rm.TRUE. = NA
+nl_data$NL_VIIRS.M_VCMCFG.MTSALL.MEAN.RGFT_201202_mean.....na.rm.TRUE. = NA
+nl_data$NL_VIIRS.M_VCMCFG.MTSALL.MEAN.RGFT_201203_mean.....na.rm.TRUE. = NA
+
+```
+
+
+```{r PRP}
 # Melt Nightlights data by region, district and township
 
 # Drop country and area
@@ -210,9 +280,65 @@ nl_data$variable = sub("(.{4})(.*)", "\\1/\\2", nl_data$variable)
 nl_data$variable = paste(nl_data$variable, "/01", sep = "")
 nl_data$variable = as.Date(nl_data$variable)
 
-# Assign more identificable names to the columns
+# Order by date
+nl_data = nl_data[order(nl_data$variable),]
+
+# Assign more identifiable names to the columns
 colnames(nl_data) <- c("region", "district", "township", "date", "radiance")
 
+```
+
+
+```{r EDA}
+# Explore variability of the readings by township
+
+
+
+```
+
+
+```{r PRP2}
+# Create a dataframe with the NL changes by township and region
+
+# initialize dataframe
+nl_changes <- data.frame(region=character(),
+                         district=character(),
+                         township=character(),
+                         first=double(),
+                         last=double(),
+                         stringsAsFactors=FALSE)
+
+# Calculate changes from first NL reading to last NL reading
+parameter_startDate = "2012-04-01"
+parameter_endDate = "2019-12-01"
+
+# Changes are normalized by year (like we do with  %  of interest of money):
+# the readings change will be divided by the years between the first and last date
+parameter_date_years <- as.numeric(difftime(parameter_endDate, parameter_startDate, unit="weeks"))/52.25
+
+for (i in 1:nrow(rg_list)) {
+  
+  nl_temp = nl_data[which(nl_data$region==rg_list[i,1]), ]
+  nl_temp = nl_temp[(nl_temp$date==parameter_startDate | nl_temp$date==parameter_endDate),]
+  nl_temp = cast(nl_temp, region+district+township~date, mean, value = "radiance")
+  names(nl_temp) = c("region", "district", "township", "first", "last")
+  nl_temp$change = nl_temp$last/nl_temp$first/parameter_date_years
+
+  # assign levels
+  nl_temp = nl_temp %>% 
+  mutate(level = case_when(
+    change < -0.30 ~ "Strong Decrease",
+    change < -0.05 ~ "Decrease",
+    change < 0.05 ~ "Similar",
+    change < 0.30 ~ "Increase",
+    change >= 0.30 ~ "Strong Increase",
+  ))
+  
+  # append the rows to the nl_changes dataframe
+  nl_changes = rbind(nl_changes, nl_temp)
+
+}
+  
 ```
 
 
@@ -519,77 +645,6 @@ ggplot(cn_explore, aes(x=year, fill=event_prec)) +
 ```
 
 
-```{r LDA}
-# Load geographical data
-
-# Country level
-geo_file <- paste(dir_data, "geo/gadm36_MMR_0_sp.rds", sep="")
-co_geo <- readRDS(geo_file)
-
-# Region/State level
-geo_file <- paste(dir_data, "geo/gadm36_MMR_1_sp.rds", sep="")
-rg_geo <- readRDS(geo_file)
-
-# District level
-geo_file <- paste(dir_data, "geo/gadm36_MMR_2_sp.rds", sep="")
-ds_geo <- readRDS(geo_file)
-
-# Township level
-geo_file <- paste(dir_data, "geo/gadm36_MMR_3_sp.rds", sep="")
-tw_geo <- readRDS(geo_file)
-
-# MIMU Township level
-#geo_file <- "E:/Data Lights/Data/geo/mmr_polbnda_250k_adm3_mimu/mmr_polbnda_250k_adm3_mimu.shp"
-#tw_geo_MIMU <- st_read(geo_file)
-
-
-```
-
-
-```{r PRP}
-# Create variables for the geographical data
-
-# create a list of regions and states
-rg_list = as.list(rg_geo@data$NAME_1)
-
-# There are 2 townships with the same name in the same Region, so we will use for the Maubin region
-# township the name that appears in the VARNAME_3 column: "Danuphyu".
-tw_geo@data$NAME_3[tw_geo@data$NAME_2=="Maubin" & tw_geo@data$NAME_3=="Danubyu"] <- "Danuphyu"
-
-# create a list of regions and townships
-tw_list = tw_geo@data[,c(4,7,10)]
-tw_list <- cbind(id=rownames(tw_list), tw_list)
-
-```
-
-
-```{r EDA}
-# Exploring geographic dataset
-
-# plot maps and coordinates
-par(mar = c(0, 0, 0, 0)) # Set the margin on all sides to 0
-
-{plot(st_geo, col = 'lightgrey', border = 'darkgrey')
-points(cn_events$longitude, cn_events$latitude, col="red", cex=1)}
-
-# plot nightlights
-nl_explore = tw_geo
-nl_explore@data$radiance = nl_data[which(nl_data$date=="2012-04-01"), ]$radiance
-
-tm_shape(co_geo) +
-    tm_borders(col = "black", lwd = 1) +
-tm_shape(nl_explore) + 
-  tm_fill(col = "radiance", 
-          n = 10,
-          palette = "cividis", 
-          contrast = c(0,1))+
-tm_shape(st_geo) +
-    tm_borders(col = "light grey", lwd = 1, lty = "dashed", alpha = 0.6) +
-tm_legend(show=FALSE) + 
-tm_layout(frame = FALSE)
-
-
-```
 
 
 ```{r PRP}
@@ -984,50 +1039,6 @@ tm
 ```
 
 
-```{r PRP2}
-# Create a dataframe with the NL changes by township and region
-
-# initialize dataframe
-nl_changes <- data.frame(region=character(),
-                         district=character(),
-                         township=character(),
-                         first=double(),
-                         last=double(),
-                         stringsAsFactors=FALSE)
-
-# Calculate changes from first NL reading to last NL reading
-parameter_start <- as.Date(min(nl_data$date))
-parameter_end <- as.Date(max(nl_data$date))
-
-# Changes are normalized by year (like we do with  %  of interest of money):
-# the readings change will be divided by the years between the first and last date
-parameter_date_years <- as.numeric(difftime(parameter_end, parameter_start, unit="weeks"))/52.25
-
-for (i in 1:length(rg_list)) {
-  
-  nl_temp = nl_data[which(nl_data$region==rg_list[[i]]), ]
-  nl_temp = nl_temp[(nl_temp$date==parameter_start | nl_temp$date==parameter_end),]
-  nl_temp = cast(nl_temp, region+district+township~date, mean, value = "radiance")
-  names(nl_temp) = c("region", "district", "township", "first", "last")
-  nl_temp$change = nl_temp$last/nl_temp$first/parameter_date_years
-
-  # assign levels
-  nl_temp = nl_temp %>% 
-  mutate(level = case_when(
-    change < -0.30 ~ "Strong Decrease",
-    change < -0.05 ~ "Decrease",
-    change < 0.05 ~ "Similar",
-    change < 0.30 ~ "Increase",
-    change >= 0.30 ~ "Strong Increase",
-  ))
-  
-  # append the rows to the nl_changes dataframe
-  nl_changes = rbind(nl_changes, nl_temp)
-
-}
-  
-```
-
 
 ```{r EDA2}
 # Plotting levels of nightlights change by region
@@ -1414,16 +1425,18 @@ sum(md_df_pp$population, na.rm=TRUE)
 
 
 ```{r MOD}
-# Create a model that predicts people movs from radiance and conflict data
+# Create a model that predicts people movements from radiance and conflict data
 
-# Cannot predict future movements of people as we dont have the deaths neither rads preds,
-# so what we can do is predict past human movements, beinG population the variable to predict,
-# not radiance as we thought, at least by now....
+# For this problem we wan´t to infer population based on radiance, events and deaths
+# This prediction will be made by region, month and year
+# Once we have population, we will automatically calculate the % of change
 
-# we can estimate the correlation between radiance and population
+# The selected features are n_events_c_deaths, u_deaths, t_deaths, and radiance
+# The variable to predict is population
+
+# add month to the model
 
 # https://srnghn.medium.com/machine-learning-trying-to-predict-a-numerical-value-8aafb9ad4d36
-
 
 # backup the df
 md_df_pp_backup <- md_df_pp 
@@ -1439,136 +1452,201 @@ md_df_pp_backup <- md_df_pp
 
 set.seed(100)
 
-# model by township with conflicts data
-# Select observations where we have population to build the model
-md_df <- md_df_pp[md_df_pp$population>0,]
+# initialize models evaluation results dataframe
+md_lm_evaluation <- data.frame(region=character(),
+                            MSE=double(),
+                            RMSE=double(),
+                            AIC=double(),
+                            corrAccuracy=double(),
+                            min_max_accuracy=double(),
+                            mape=double(),
+                            stringsAsFactors=FALSE)
 
-# Create training and test data
-md_rowIndex <- sample(1:nrow(md_df), 0.8*nrow(md_df))
-md_df_training <- md_df[md_rowIndex, ] # training data
-md_df_testing  <- md_df[-md_rowIndex, ] # test data
+# initialize list to store the models
+colNames <- c("region", "model")
+md_list <- vector(mode = "list", length = 2)
+names(md_list) <- colNames
 
-# Build the model on training dataset
-md_lm <- lm(population ~ radiance+area, data=md_df_training)
+# create models by region
+for (i in 1:nrow(rg_list)) {
 
-# Evaluate the model
-summary(md_lm)
-AIC(md_lm)
+  # Select observations for each township where we have population to build the model
+  md_df_temp <- md_df_pp[md_df_pp$region == rg_list[i,1] &
+                      md_df_pp$population > 0,]
 
-# Generate the predictions of population on test dataset
-predictions <- predict(md_lm, md_df_testing)
-
-# Attach previous predictions to the test dataset
-md_df_preds <- data.frame(cbind(actual=md_df_testing$population, predicted=predictions))
-
-# Evaluate the predictions
-md_lm_corrAccuracy <- cor(md_df_preds)
-md_min_max_accuracy <- mean(apply(md_df_preds, 1, min) / apply(md_df_preds, 1, max))  
-md_mape <- mean(abs((md_df_preds$predicted - md_df_preds$actual))/md_df_preds$actual)  
-
-# k-Fold cross validation
-library(DAAG)
-cvResults <- suppressWarnings(CVlm(md_df, 
-                                   form.lm=population ~ n_events+c_deaths+t_deaths+radiance, 
-                                   m=5, 
-                                   dots=FALSE, 
-                                   seed=29, 
-                                   legend.pos="topleft",  
-                                   printit=FALSE, 
-                                   main="Small symbols are predicted values while bigger ones are actuals")); 
-
-# performs the CV
-attr(cvResults, 'ms')  # => 251.2783 mean squared error
-
-```
-
-
-```{r MOD}
-
-# K-Nearest Neigbours
-
-
-
-
-```
-
-
-
-```{r MOD}
-
-# Use model to predict data that we don´t know
-
-md_temp <- md_df_pp[md_df_pp$population==0,]
-predictions <- predict(md_lm, md_temp) # predict population
-
-md_df_preds <- data.frame(cbind(md_final, predictions))
-md_df_preds$population = NULL
-colnames(md_df_preds)[11] <- "population"
-md_final <- data.frame(rbind(md_df,md_df_preds))
-
-```
-
-
-```{r EDA23}
-# Ploting the prediction
-
-# https://www.r-graph-gallery.com/283-the-hourly-heatmap.html
-
-
-data <- data(Trentino_hourly_T,package = "Interpol.T")
- 
-names(h_d_t)[1:5]<- c("stationid","date","hour","temp","flag")
-df <- tbl_df(h_d_t) %>%
-  filter(stationid =="T0001")
- 
-df <- df %>% mutate(year = year(date),
-                  month = month(date),
-                  day = day(date))
+  # As some regions haven´t enough observations, we skip them in the model
+  if (nrow(md_df_temp) > 2) {
+    
+    # Split in training and test data
+    md_df_index <- sample(1:nrow(md_df_temp), 0.8*nrow(md_df_temp))
+    md_df_training <- md_df_temp[md_df_index, ] # training data
+    md_df_testing  <- md_df_temp[-md_df_index, ] # test data
+    
+    # Build the model using training data
+    md_lm <- lm(population ~ radiance+area+n_events+c_deaths+t_deaths, data=md_df_training)
+    
+    # Store the results of the model performance
+    md_lm_evaluation[i,1] = rg_list[i,1] # region
   
-df$date<-ymd(df$date) # not necessary for plot but 
-#useful if you want to do further work with the data
- 
-#cleanup
-rm(list=c("h_d_t","mo_bias","Tn","Tx",
-          "Th_int_list","calibration_l",
-          "calibration_shape","Tm_list"))
- 
- 
-#create plotting df
-df <-df %>% select(stationid,day,hour,month,year,temp)%>%
-        fill(temp) #optional - see note below
-
-
-md_temp = md_final[md_final$region == parameter_region,]
- 
-    p <- ggplot(md_temp, aes(month, township, fill=population)) +
-          geom_tile(color="white", size=0.5) + 
-          scale_fill_viridis(name="Population", option="E") +
-          facet_grid(.~year)
+    md_lm_evaluation[i,2] = c(crossprod(md_lm$residuals)) / length(md_lm$residuals) # MSE
+    md_lm_evaluation[i,3] = sqrt(c(crossprod(md_lm$residuals)) / length(md_lm$residuals)) # RMSE
+    md_lm_evaluation[i,4] = AIC(md_lm) # AIC
     
-    p <- p + theme(
-      panel.spacing.x=unit(0.05, "lines"), 
-      panel.spacing.y=unit(0.01, "npc"),
-      panel.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
-      plot.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
-      plot.title=element_blank(),
-      legend.position = "none",
-      axis.title.y=element_blank(),
-      axis.text.y=element_blank(),
-      axis.ticks.y=element_blank(),
-      axis.title.x=element_blank(),
-      axis.text.x=element_blank(),
-      axis.ticks.x=element_blank(),
-      strip.background = element_blank()
-      ) +
-        xlab("") + 
-        ylab("") +
-        removeGrid()
-
-    ggplotly(p)
+    # Generate the predictions on the test data
+    md_predictions <- predict(md_lm, md_df_testing)
     
+    # Attach previous predictions to the real values to measure accuracy
+    md_df_preds <- data.frame(cbind(actual=md_df_testing$population, predicted=md_predictions))
+    
+    # Store the results of the predictions accuracy
+    md_lm_evaluation[i,5] <- cor(md_df_preds$actual, md_df_preds$predicted) # corrAccuracy
+    md_lm_evaluation[i,6] <- mean(apply(md_df_preds, 1, min) / apply(md_df_preds, 1, max)) # min_max_accuracy 
+    md_lm_evaluation[i,7] <- mean(abs((md_df_preds$predicted - md_df_preds$actual))/md_df_preds$actual) # mape
+    
+    # Append the model to the list
+    md_list$region[[i]] <- rg_list[i,1]
+    md_list$model[[i]] <- md_lm
+    
+  } else {
+    
+    md_lm_evaluation[i,1] <- rg_list[i,1]
+
+    md_list$region[[i]] <- rg_list[i,1]
+    md_list$model[[i]] <- NULL
+
+  }
+
+}
+
+
 ```
 
+
+```{r MOD}
+# Use models to predict data on observations without population data available
+
+# initialize results dataframe
+md_df_results <- data.frame(region=character(),
+                            district=character(),
+                            township=character(),
+                            area=double(),
+                            month=integer(),
+                            year=integer(),
+                            n_events=integer(),
+                            c_deaths=integer(),
+                            t_deaths=integer(),
+                            radiance=double(),
+                            population=integer(),
+                            stringsAsFactors=FALSE)
+
+
+# Predict data for each township applying the regional model
+for (i in 1:nrow(rg_list)) {
+  
+  # We don´t predict those regions without a model
+  if (!is.null(md_list$model[[i]])) {
+    
+    # Subset the observations where we don´t have population by region 
+    md_df_temp <- md_df_pp[md_df_pp$region == rg_list[i,1] &
+                          md_df_pp$population == 0,]
+    md_df_temp$population <- NULL
+    
+    # For each township/period in the region, apply the regional model
+    md_predictions <- predict(md_list$model[[i]], md_df_temp)
+    
+    # attach the predictions column to the temp dataframe
+    md_df_temp <- data.frame(cbind(md_df_temp, md_predictions))
+  
+    # add the current predicted rows to the results dataframe
+    md_df_results = data.frame(rbind(md_df_results, md_df_temp))
+    
+  }
+
+}
+
+# bind the results dataframe to the real observations
+md_df_temp = md_df_pp[md_df_pp$population > 0,]
+
+names(md_df_results)[11] <- "population"
+md_df_results <- data.frame(rbind(md_df_temp, md_df_results))
+  
+```
+
+
+```{r PRP}
+# Create the dataframe with population changes
+
+# population changes will be shown as month by month change
+# we will use the results of the model predictions
+# values calculated as a year average by district
+pp_changes <- md_df_results
+
+# Drop the columns that we don´t need
+pp_changes = pp_changes[,-c(4,7,8,9,10)]
+
+# dataframe must be ordered by township, year and month to work properly
+pp_changes = pp_changes[order(pp_changes$region,
+                              pp_changes$district,
+                              pp_changes$township,
+                              pp_changes$year,
+                              pp_changes$month),]
+
+# calculate the % of change
+pp_changes <- pp_changes %>%
+    mutate(change = 100 * (population - lag(population))/lag(population))
+
+# assign levels of change
+pp_changes = pp_changes %>% 
+  mutate(change_level = case_when(
+    change < -0.30 ~ "Strong Decrease",
+    change < -0.05 ~ "Decrease",
+    change < 0.05 ~ "Similar",
+    change < 0.30 ~ "Increase",
+    change >= 0.30 ~ "Strong Increase")
+  )
+  
+```
+
+
+```{r EDA}
+# Prediction Plot
+
+changesPalette = c("#00dfff","#D6EFF6","#F2F3EC","#fdfce1","#fbf79b")
+names(changesPalette) = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
+changesScale <- scale_colour_manual(name = "changes_level",values = changesPalette)
+
+pp_temp = pp_changes[pp_changes$region == parameter_region,]
+
+p <- ggplot(pp_temp, aes(month, township, fill=change_level)) +
+    geom_tile(color="white", size=0.5) + 
+    scale_fill_manual(values = changesPalette) +
+#    scale_fill_viridis(name="changes_level", option="E") +
+    facet_grid(.~year)
+
+p <- p + theme(
+    panel.spacing.x=unit(0.05, "lines"), 
+    panel.spacing.y=unit(0.01, "npc"),
+    panel.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
+    plot.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
+    plot.title=element_blank(),
+    legend.position = "none",
+    axis.title.y=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks.y=element_blank(),
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    axis.text=element_text(size=5),
+    strip.background = element_blank()
+) +
+    xlab("") + 
+    ylab("") +
+    removeGrid()
+
+ggplotly(p)
+
+  
+```
 
 
 ```{r PRP}
@@ -1595,8 +1673,11 @@ save(nl_data, file=nl_file)
 nl_file = "E:/Data Lights/Shiny/nl_changes.rda"
 save(nl_changes, file=nl_file)
 
-md_file = "E:/Data Lights/Shiny/md_final.rda"
-save(md_final, file=md_file)
+md_file = "E:/Data Lights/Shiny/md_df_results.rda"
+save(md_df_results, file=md_file)
+
+pp_file = "E:/Data Lights/Shiny/pp_changes.rda"
+save(pp_changes, file=pp_file)
 
 ```
 

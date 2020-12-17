@@ -115,10 +115,10 @@ ui <- shinyUI(fluidPage(
       
         id = "messages", class = "messages", 
         fixed = TRUE, draggable = FALSE, 
-        top = "auto", left = "0%", bottom = "3%",
+        top = "auto", left = "0%", bottom = "4.5%",
         width = "16%", height = "6%",
        
-        "App in development (v.21),",
+        "App in development (v.22),",
         br(),
         "some features may not be available"
 
@@ -134,14 +134,21 @@ ui <- shinyUI(fluidPage(
         zindex = 100,
 
         tmapOutput("map", width = "100%", height = "100%"),
+        
+
         h2("Radiance changes in the events locations"),
         h1("Yearly-changes rates from Apr-1992 to Dec-2019"),
-        
+
+
         # Click township button
         
 
       ), # absolute panel - Map
              
+      #  play with top % and if it doesnt work,
+      # add fluid page and 2 rows to align the predictions to the explorations
+      # https://mastering-shiny.org/basic-ui.html
+      
       # Explorations
       absolutePanel(
        
@@ -179,8 +186,8 @@ ui <- shinyUI(fluidPage(
         width = "26%", height = "39%",
         
         # plot
-        h4("Estimated population change by township", style = "text-align: center; padding-top: 5px;"),
-        plotlyOutput("prediction_plot", width = "97%", height = "84%")
+        h4("Estimated population change", style = "text-align: center; padding-top: 5px;"),
+        plotlyOutput("prediction_plot", width = "98%", height = "85%")
         
       ) # absolute panel - Predictions
            

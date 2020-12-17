@@ -205,7 +205,14 @@ server <- function(input, output, session){
     # prediction information
     md_data <- reactive ({
         
-        md_final[md_final$region == input$region,]
+        md_df_results[md_df_results$region == input$region,]
+        
+    })
+    
+    # population changes information
+    pp_data <- reactive ({
+        
+        pp_changes[pp_changes$region == input$region,]
         
     })
     
@@ -224,7 +231,7 @@ server <- function(input, output, session){
             tm_shape(nl_data()) + 
             tm_fill(col = "change",
                     breaks = changesBreaks,
-                    labels = changesLevels,
+                    labels = names(changesPalette),
                     palette = changesPalette,
                     contrast = c(0,1),
                     zindex = 402,
@@ -274,7 +281,7 @@ server <- function(input, output, session){
                 tm_shape(nl_data()) + 
                 tm_fill(col = "change",
                         breaks = changesBreaks,
-                        labels = changesLevels,
+                        labels = names(changesPalette),
                         palette = changesPalette,
                         contrast = c(0,1),
                         zindex = 402,
@@ -411,33 +418,33 @@ server <- function(input, output, session){
     output$prediction_plot <- renderPlotly({
         
 
-        p <- ggplot(md_data(), aes(month, township, fill=population)) +
-            geom_tile(color="white", size=0.5) + 
-            scale_fill_viridis(name="Population", option="E") +
+        p <- ggplot(pp_data(), aes(month, township, fill=as.factor(change_level))) +
+            geom_tile(color="grey", size=0.1) + 
+            scale_fill_manual(values=changesPalette, na.value="white") +
             facet_grid(.~year)
         
         p <- p + theme(
-            panel.spacing.x=unit(0.05, "lines"), 
-            panel.spacing.y=unit(0.01, "npc"),
+            panel.spacing.x=unit(0.01, "lines"), 
+            panel.spacing.y=unit(0.01, "lines"),
             panel.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
             plot.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
             plot.title=element_blank(),
+            strip.background = element_blank(),
             legend.position = "none",
-            axis.title.y=element_blank(),
+            axis.title.y=element_text(size=7, colour="dark grey"),
             axis.text.y=element_blank(),
             axis.ticks.y=element_blank(),
             axis.title.x=element_blank(),
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank(),
-            axis.text=element_text(size=5),
-            strip.background = element_blank()
+            axis.text=element_blank(),
+            strip.text.x = element_text(size=6, colour="dark grey", angle=90),
         ) +
             xlab("") + 
-            ylab("") +
+ #           ylab("") +
             removeGrid()
         
-        ggplotly(p)
-    
+        ggplotly(p) 
         
     })
     

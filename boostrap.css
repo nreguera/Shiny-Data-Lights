@@ -140,14 +140,25 @@ h6 {
 
 /* Slider */
 .irs {
-	margin-top: -6%;
-	margin-bottom: -4%;	
+	margin-top: -7%;
+	margin-bottom: -3%;
+}
+
+.irs-bar {
+	border-top-color: #B9B9B9;
+	border-bottom-color: #B9B9B9;
+	background: #B9B9B9;
 }
 
 .irs-from, .irs-to { 
 	display: none;
 	color: black; 
-	background: transparent 
+	background: transparent;
+}
+
+.irs-slider.to {
+	background: #B9B9B9; 
+	border: #B9B9B9; 
 }
 
 /* NOTIFICATIONS */
