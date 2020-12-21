@@ -63,7 +63,7 @@ h4 {
 h5 {
 	font-size:12px;
 	font-weight: bold;
-	margin-bottom: 0.6em ;
+	margin-bottom: 0.2em ;
 }
 
 h6 {
@@ -261,9 +261,27 @@ h6 {
 
 /* DATA */
 
+#data_instructions {
+	font-size: 9px;
+	text-align: bottom !important;
+	padding: 2% !important;
+	background-color: #FAFAFA;
+	border-width: 2px;
+	border-color: #000000;
+}
+
 #data {
 	border-radius: 8px !important;
 	text-align: center !important;
 	padding: 5% !important;
 	background-color: #FAFAFA;
+}
+
+#data_info {
+	font-size: 9px;
+	text-align: bottom !important;
+	padding: 2% !important;
+	background-color: #FAFAFA;
+	border-width: 2px;
+	border-color: #000000;
 }

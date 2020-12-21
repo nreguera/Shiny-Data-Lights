@@ -2,25 +2,24 @@
 # Loads everything to the global R session environment.
 # It will be called first and only once for each session. 
 #
-# We will define here the functions that never change (i.e. draw map). These functions will collect the parameters
-# and the data from the server file.
+# We will define here the functions that never change. 
+# These functions will collect the parameters and the data from the server file.
 #
 
 ### Load the libraries ---------------------------------------------------------
+
+# Exploration
 library(rgdal)
 require(rgeos)
 library(ggplot2)
-
-
-#for the prediction
-
-library(dplyr) # easier data wrangling 
-library(viridis) # colour blind friendly palette, works in B&W also
-library(lubridate) # for easy date manipulation
-library(ggExtra) # because remembering ggplot theme options is beyond me
-library(tidyr) 
 library(plotly)
 library(scales)
+
+# Processing
+library(dplyr) 
+#library(lubridate) 
+library(ggExtra)
+library(tidyr) 
 
 ### Read in data files ---------------------------------------------------------
 
@@ -32,42 +31,51 @@ tw_geo <- readRDS("gadm36_MMR_3_sp.rds")
 load(file="cn_conflicts.rda")
 load(file="cn_conflicts_list.rda")
 load(file="cn_events.rda")
-#load(file="cn_events_geo.rda")
 load(file="cn_locations.rda")
-#load(file="cn_events_explore.rda")
-load(file="nl_data.rda")
-load(file="nl_changes.rda")
-load(file="md_df_results.rda")
+load(file="cn_locations_detail.rda")
+#load(file="nl_changes.rda")
 load(file="pp_changes.rda")
-
 
 ### Set variables --------------------------------------------------------------
 
-parameter_startDate = as.Date("2012-01-01")
-parameter_endDate = as.Date("2019-12-31")
+# Dates based on region and conflict
+parameter_startDate = as.Date(min(nl_data$date))
+parameter_endDate = as.Date(max(nl_data$date))
+parameter_region = "Kachin"
 
-st_layer = st_geo[st_geo@data$NAME_1=="Kachin",]
+st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
 
 # https://htmlcolorcodes.com/color-picker/
 severityPalette = c("#FF0000","#C0C0C0","#FF8C00")
 names(severityPalette) <- levels(cn_events$severity_level)
-severityScale <- scale_colour_manual(name = "severity_level",values = severityPalette)
+severityScale <- scale_colour_manual(name="severity_level", values=severityPalette)
 
 changesPalette = c("#00dfff","#D6EFF6","#F2F3EC","#fdfce1","#fbf79b")
-names(changesPalette) = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase")
-changesScale <- scale_colour_manual(name = "changes_level",values = changesPalette)
+names(changesPalette) = c("Plummeted", "Decreased", "Similar", "Increased", "Rocketed")
+changesScale <- scale_colour_manual(name = "light_level", values=changesPalette)
 changesBreaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1)
 
-score = mean(cn_events[cn_events$region == "Kachin", 30])
-level = case_when(
-  score < 20 ~ "Low",
-  score < 50 ~ "Medium",
+severity_score = mean(cn_events[cn_events$region == "Kachin", 30], na.rm=TRUE)
+severity_level = case_when(
+  severity_score < 20 ~ "Low",
+  severity_score < 50 ~ "Medium",
   TRUE ~ "High"
 )
 
+lights_score = mean(nl_changes[nl_changes$region == "Kachin", 6], na.rm=TRUE)
+lights_level = case_when(
+  lights_score < -0.3 ~ "Plummeted",
+  lights_score < -0.05 ~ "Decreased",
+  lights_score < 0.05 ~ "Similar",
+  lights_score < 0.3 ~ "Increased",
+  TRUE ~ "Rocketed"
+)
+
+tmap_mode("view")
+
 ### Functions to display correct UI options ------------------------------------
 
-# A function factory for getting integer y-axis values.
+# A function for getting integer y-axis values
 integer_breaks <- function(n = 5, ...) {
   
   fxn <- function(x) {
@@ -78,8 +86,6 @@ integer_breaks <- function(n = 5, ...) {
   
   return(fxn)
 }
-
-
 
 ### Functions to get correct dataframes based on parameters --------------------
 
@@ -157,7 +163,7 @@ draw_nl_layer <- function(map, layer, session) {
       
     # add layers
     tm_shape(layer) + 
-    tm_fill(col = "change",
+    tm_fill(col = "light_level",
             breaks = c(-1, -0.3, -0.05, 0.05, 0.3, 1),
             labels = c("Strong Decrease", "Decrease", "Similar", "Increase", "Strong Increase"),
             palette = "RdYlGn",

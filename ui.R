@@ -118,7 +118,7 @@ ui <- shinyUI(fluidPage(
         top = "auto", left = "0%", bottom = "4.5%",
         width = "16%", height = "6%",
        
-        "App in development (v.22),",
+        "App in development (v.23),",
         br(),
         "some features may not be available"
 
@@ -129,15 +129,18 @@ ui <- shinyUI(fluidPage(
       
         id = "map", class = "panel panel-default", 
         fixed = TRUE, draggable = FALSE, 
-        top = 75, left = "22%", bottom = "auto",
-        width = "50%", height = "85%",
+        top = 75, left = "21%", bottom = "auto",
+        width = "50%", height = "86%",
         zindex = 100,
 
         tmapOutput("map", width = "100%", height = "100%"),
         
 
-        h2("Radiance changes in the events locations"),
-        h1("Yearly-changes rates from Apr-1992 to Dec-2019"),
+        h2("Impact of the conflicts over nightlights changes"),
+        h1(paste0("Yearly rates from ",
+                  month.abb[month(parameter_startDate)], "-", format(parameter_startDate,"%Y"),
+                  " to ",
+                  month.abb[month(parameter_endDate)], "-", format(parameter_endDate,"%Y"))),
 
 
         # Click township button
@@ -155,7 +158,7 @@ ui <- shinyUI(fluidPage(
         id = "past", class = "panel panel-default",
         fixed = TRUE, draggable = FALSE, 
         top = 75, right = "1%", bottom = "auto",
-        width = "26%", height = "44%",
+        width = "26%", height = "45%",
       
         # KPIs
         fluidRow(
@@ -182,7 +185,7 @@ ui <- shinyUI(fluidPage(
        
         id = "future", class = "panel panel-default",
         fixed = TRUE, draggable = FALSE, 
-        top = "auto", right = "1%", bottom = "1.6%",
+        top = "auto", right = "1%", bottom = "1%",
         width = "26%", height = "39%",
         
         # plot
@@ -212,6 +215,32 @@ ui <- shinyUI(fluidPage(
 
     tabPanel("Data",
              
+     # Instructions
+     absolutePanel(
+       
+       id = "data_instructions", class = "parameters", 
+       fixed = TRUE, draggable = FALSE, 
+       top = 75, left = "1%", bottom = "auto",
+       width = "18%", height = "80%",
+       
+       h5("Data interpretation"),
+       br(),
+       br(),
+       
+       "For the severity of the events",
+       hr(),
+       "For the nightlights change",
+       hr(),
+       "For the accuracy of the events",
+       hr(),
+       "For the map",
+       hr(),
+       "For the exploration plot",
+       hr(),
+       "For the prediction plot",
+       
+       ),
+      
       # Text
       absolutePanel(
        
@@ -223,7 +252,28 @@ ui <- shinyUI(fluidPage(
        includeMarkdown("Data.Rmd"),
        br()
        
-      ) # absolute panel - Text
+      ), # absolute panel - Text
+      
+      # info
+      absolutePanel(
+        
+        id = "data_info", class = "parameters",
+        fixed = TRUE, draggable = FALSE, 
+        top = "50%", right = "1%", bottom = "auto",
+        width = "26%", height = "100%",
+        
+        "The data related to the nightlights have some circumstances that make use them difficult",
+        "so the project will be halted until new improvements are made.",
+        hr(),
+        "The models will be updated when the nightlights data provides mor accuracy about the readings",
+        "At the moment, unforyunately, they don´t reflect accurate predictions becasue as commented before",
+        "there are some issues with the nightlights data that make the modeling extremely difficult",
+        hr(),
+        "For the collection of the conflicts data it has been used a restful API. I don´t expect the",
+        "structure of the data changes, but if you see some error, please let me know.",
+        "For the nightlights data there is set up a manual process as it involves more processing time."
+        
+      ) # absolute panel - info
 
     ) # tabPanel - Data
 
