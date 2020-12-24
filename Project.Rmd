@@ -6,24 +6,11 @@ keep_md: TRUE
 
 <center>
 
-<br>
-<br>
-<br>
-<br>
-
 ### Exploring the drivers of migration in the Lower Mekong Region through the nightlights lens
 
 <br>
 <br>
 
-The objective of this project is to use open data to provide tools that help tackling social issues, through the exploration and estimation of information that uses night lights data as a predictor of past (where data doesn't exist) and future changes.
-
-<br>
-<br>
-
-*more updates soon...*
-
-<br>
-
+The main goal of this project is  to provide tools to understand the impact of migration on development in the Lower Mekong Region using open data sources that help tackling social issues, through the exploration and estimation of information as a predictor of past (where data doesn't exist) and future changes.
 
  </center>

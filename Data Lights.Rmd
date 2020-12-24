@@ -23,8 +23,13 @@ knitr::opts_chunk$set(message = FALSE,
                       echo = FALSE,
                       cache = FALSE)
 
+# Clean and load global environment
+rm(list = ls())
+file = paste0(dirname(getwd()), "/myEnvironment.RData", sep="")
+load(file)
+
 # remove the vatiables that we don´t want
-rm(myPaths)
+rm(file)
 
 ```
 
@@ -39,28 +44,28 @@ library(Rnightlights)
 # Process data
 library(sp)
 library(tidyverse)
-#library(factoextra)
 library(lubridate)
 library(reshape)
 library(rgdal)
 require(rgeos)
-#library(data.table)
 library(sf)
+library(rmapshaper)
 
 # Explore data
 library(ggplot2)
 library(tmap)
-#library(highcharter)
+library(tmaptools)
 library(leaflet)
-#library(hrbrthemes)
 library(plotly)
-#library(viridis)
 library(ggExtra)
 library(tidyr) 
 
 # Model data
 library(DAAG)
 library(mclust)
+
+# Performance
+library(shinyloadtest)
 
 # Clear console
 cat("\014")
@@ -173,10 +178,13 @@ tw_list <- cbind(id=rownames(tw_list), tw_list)
 
 
 ```{r PRP}
-# Transform the map into a simplified map
-#pm = st_as_sf(provinces.map) %>%
-#  rmapshaper::ms_simplify()
-#names(pm)[4] <- "province"
+# Simplify the polygons in the map layers
+
+# Region/state level
+#rg_geo = ms_simplify(rg_geo, keep = 0.1)
+
+# Township level
+#tw_geo = ms_simplify(tw_geo, keep = 0.1)
 
 ```
 
@@ -318,6 +326,8 @@ nl_temp <- nl_temp %>%
 # plot
 nl_plot <- ggplot(nl_temp, aes(date, change)) + geom_point(size=0.8, alpha=0.5)
 ggplotly(nl_plot)
+
+rm(nl_temp, nl_plot)
 
 ```
 
@@ -1208,42 +1218,6 @@ tm_layout(frame=FALSE)
 ```
 
 
-```{r EDA}
-# Plotting levels of nightlights change by region
-
-st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
-tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
-
-nl_layer = tw_geo[which(tw_geo@data$NAME_1==parameter_region),]
-nl_layer@data$change = nl_changes[which(nl_changes$region==parameter_region),5]
-
-myBreaks <- c(-1, -0.3, -0.05, 0.05, 0.3, 1)
-myLabels <- c("Plummeted", "Decreased", "Similar", "Increased", "Rocketed")
-myPalette <- c("#f2f0f7", "#cbc9e2", "#9e9ac8", "#6a51a3", "#6a51a3")
-
-tm_shape(nl_layer) + 
-  tm_fill(col = "change",
-          #style = "fixed",
-          breaks = myBreaks,
-          labels = myLabels,
-          palette = "RdYlGn",
-          contrast = c(0,1)) +
-
-tm_shape(tw_layer) +
-    tm_borders(col = "white", 
-               lwd = 1, 
-               alpha = 0.4) +
-
-tm_shape(st_layer) +
-    tm_borders(col="black", lwd=1) +
-  
-tm_layout(frame = FALSE)
-
-
-```
-
-
-
 ```{r LDA}
 # Load population data from the census
 
@@ -1597,7 +1571,7 @@ sum(pp_predictions$pop, na.rm=TRUE)
 #50,279,900
 
 # remove variables that we don´t need anymore
-rm(census_date, pp_temp, tw_mapping, tw_mapping_selected, i, j, pp_base)
+rm(census_date, pp_temp, tw_mapping, tw_mapping_selected, pp_base)
 
 ```
 
@@ -1795,48 +1769,63 @@ changesScale <- scale_colour_manual(name = "light_level",values = changesPalette
 pp_temp = pp_changes[pp_changes$region == parameter_region,]
 
 p <- ggplot(pp_temp, aes(month, township, fill=light_level)) +
-    geom_tile(color="white", size=0.5) + 
-    scale_fill_manual(values = changesPalette) +
+    geom_tile(color="grey", size=0.1) + 
+    scale_fill_manual(values=changesPalette, na.value="white") +
     facet_grid(.~year)
 
 p <- p + theme(
-    panel.spacing.x=unit(0.05, "lines"), 
-    panel.spacing.y=unit(0.01, "npc"),
+    panel.spacing.x=unit(0.01, "lines"), 
+    panel.spacing.y=unit(0.01, "lines"),
     panel.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
     plot.background = element_rect(fill = "#F5F5F5", color = "#F5F5F5"),
     plot.title=element_blank(),
+    strip.background = element_blank(),
     legend.position = "none",
-    axis.title.y=element_blank(),
+    axis.title.y=element_text(size=7, 
+                              colour="dark grey",
+                              margin = margin(t = 0, r = 15, b = 0, l = 0)),
     axis.text.y=element_blank(),
     axis.ticks.y=element_blank(),
     axis.title.x=element_blank(),
     axis.text.x=element_blank(),
     axis.ticks.x=element_blank(),
-    axis.text=element_text(size=5),
-    strip.background = element_blank()
+    axis.text=element_blank(),
+    strip.text.x = element_text(size=6, colour="dark grey", angle=90)
 ) +
     xlab("") + 
-    ylab("") +
+    ylab("townships") +
     removeGrid()
 
-ggplotly(p)
+ggplotly(p) 
 
+
+```
+
+
+```{r EDA}
+# Prediction plot using plotly without conversion to speed up the process
+
+#https://stackoverflow.com/questions/60763006/improve-performance-of-ggplotly-when-plotting-time-series-heatmap
+# https://community.plotly.com/t/poor-javascript-heatmap-performance/3683/6
   
 ```
 
 
 ```{r PRP}
-# Assign the same names from GADM to the population data
+# Save files and variables
 
 # Export files for the web app
 
-# Save geographical shapes
-#file = "E:/Data Lights/Shiny/nl_data.rda"
-#save(nl_data, file=file)
+# Save geographical shapes simplified
+file = "E:/Data Lights/Shiny/rg_geo.rds"
+saveRDS(rg_geo, file=file)
+
+file = "E:/Data Lights/Shiny/tw_geo.rds"
+saveRDS(tw_geo, file=file)
 
 # Save dataframes
-#file = "E:/Data Lights/Shiny/nl_data.rda"
-#save(nl_data, file=file)
+file = "E:/Data Lights/Shiny/nl_data.rda"
+save(nl_data, file=file)
 
 file = "E:/Data Lights/Shiny/nl_changes.rda"
 save(nl_changes, file=file)
@@ -1859,8 +1848,29 @@ save(cn_locations_detail, file=file)
 file = "E:/Data Lights/Shiny/pp_changes.rda"
 save(pp_changes, file=file)
 
+# Save global environment
+file = paste0(dirname(getwd()), "/myEnvironment.RData", sep="")
+save.image(file=file)
+
 # remove variables that we don´t need
 rm(file)
 
 ```
 
+  
+```{r EDA, eval=FALSE}
+# App performance
+
+# https://mastering-shiny.org/performance.html
+# shinyloadtest::record_session("http://127.0.0.1:3729", output_file = "Logs/recording.log")
+
+# run in PowerShell this command (where shinycannon is placed, not need to "install" it)
+java -jar shinycannon-1.0.0-9b22a92.jar "E:/Data Lights/recording.log" http://127.0.0.1:3729 --workers 3 --loaded-duration-minutes 1 --output-dir run1
+
+# load the results
+df <- load_runs("E:/Data Lights/run1")
+
+# show the data
+shinyloadtest_report(df, "report.html")
+
+```

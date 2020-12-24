@@ -5,12 +5,7 @@ output: html_document
 
 <center>
 
-<br>
-<br>
-<br>
-<br>
-
-### Open Data
+### Only Open Data
 
 <br>
 <br>
@@ -19,13 +14,15 @@ Currently the app is using the following sources of data:
 
 <br>
 
-**DMSP and OLS nightlights data**, from the Earth Observation Group, NOAA National Centers for Environmental Information (NCEI) ([source](https://www.ngdc.noaa.gov/)).
+DMSP data collected by US Air Force Weather Agency Image and data processing by NOAA's National Geophysical Data Center ([link](https://www.ngdc.noaa.gov/eog/download.html)).
+<hr style='margin-top:-1em'>
+VIIRS data produced by Earth Observation Group, Payne Institute for Public Policy ([link](https://eogdata.mines.edu/download_dnb_composites.html)).
 
-**UCDP Georeferenced Event data**, from the Department of Peace and Conflict Research, Uppsala University, [source](https://ucdp.uu.se/).
+UCDP Georeferenced Event dataset, collected by the Department of Peace and Conflict Research, Uppsala University ([link](https://ucdp.uu.se/)).
 
-**Geographical Administrative Divisions v3.6**, from GADM, [source](https://gadm.org/).
+Geographical Administrative Divisions v3.6, produced and distributed by GADM ([link](https://gadm.org/)).
 
-**Myanmar Census data**, from Myanmar Information Managament Unit, [source](http://themimu.info/).
+Myanmar Census data, produced and distributed by Myanmar Information Managament Unit ([link](http://themimu.info/)).
 
  </center>
  

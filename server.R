@@ -64,10 +64,46 @@ server <- function(input, output, session){
             
         }
         
+    })
+    
+    # update start and end date when a conflict is selected
+    
+    observeEvent(input$conflict, {
+        
+        if (input$conflict != "All conflicts in the region"){
+            
+            parameter_startDate = as.Date(min(cn_conflicts[cn_conflicts$conflict_name==input$conflict,5]))
+            if (parameter_startDate < as.Date("2012-04-01")) { parameter_startDate = as.Date("2012-04-01") }
+            parameter_endDate = as.Date(max(cn_conflicts[cn_conflicts$conflict_name==input$conflict,6]))
+ 
+            
+        } else {
+            
+            parameter_startDate = as.Date(min(cn_conflicts[cn_conflicts$region==input$region,5]))
+            if (parameter_startDate < as.Date("2012-04-01")) { parameter_startDate = as.Date("2012-04-01") }
+            parameter_endDate = as.Date(max(cn_conflicts[cn_conflicts$region==input$region,6]))
+
+        }
+        
+        output$dateRange <- renderText({ 
+            
+            dateRange <- paste0("Yearly rates from ",
+            month.abb[month(parameter_startDate)], 
+            "-", 
+            format(parameter_startDate,"%Y"),
+            " to ",
+            month.abb[month(parameter_endDate)],
+            "-",
+            format(parameter_endDate,"%Y"))
+            
+            dateRange
+        })
         
     })
     
     # update locations information layer
+    # as we have the filter of events precision, we need to build the locations dataframe in real time,
+    # as locations are made from different events, and each event can have different precision
     locations_data <- reactive ({
         
         # filter the events by region, type of conflict and conflict name
@@ -82,6 +118,14 @@ server <- function(input, output, session){
                 cn_temp = cn_events[cn_events$type_of_violence==input$type &
                                         cn_events$region==input$region,]
             }
+            
+            # filter by the events where we have nightlights information
+            cn_temp = cn_temp[cn_temp$date_start > "2012-04-01",]
+            
+            # update start and end dates
+            parameter_startDate = as.Date(min(cn_temp[,20]))
+            if (parameter_startDate < as.Date("2012-04-01")) { parameter_startDate = as.Date("2012-04-01") }
+            parameter_endDate = as.Date(max(cn_temp[,21]))
             
         } else {
             
@@ -98,7 +142,15 @@ server <- function(input, output, session){
                                         cn_events$conflict_name==input$conflict,]
             }
             
+            # filter by the events where we have nightlights information
+            cn_temp = cn_temp[cn_temp$date_start > "2012-04-01",]
+            
+            # update start and end dates
+            parameter_startDate = as.Date(min(cn_temp[,20]))
+            if (parameter_startDate < as.Date("2012-04-01")) { parameter_startDate = as.Date("2012-04-01") }
+            parameter_endDate = as.Date(max(cn_temp[,21]))
         }
+        
         
         # Filter by precision of the events
         if (input$precision[1] == "Low" & input$precision[2] == "Low") {
@@ -135,7 +187,8 @@ server <- function(input, output, session){
             cn_temp = cn_temp %>% filter(precision_level == "Medium" |
                                              precision_level == "High")
         }}}}}
-
+            
+            
         # Prepare the dataframe for analysis
         if (nrow(cn_temp)!=0) {
             
@@ -149,16 +202,16 @@ server <- function(input, output, session){
                           region = region)
             
             # add length to the locations
-            cn_temp = cn_events %>%
+            cn_temp2 = cn_temp %>%
                 group_by(longitude, latitude) %>%
                 summarise(start = min(date_start), 
                           end = max(date_end))
             
             # we add one to count one day events
-            cn_temp$length = round(as.numeric(difftime(cn_temp$end, cn_temp$start, unit="days")))+1
+            cn_temp2$length = round(as.numeric(difftime(cn_temp2$end, cn_temp2$start, unit="days")))+1
             
             # merge to the locations
-            cn_locations = merge(cn_locations, cn_temp)
+            cn_locations = merge(cn_locations, cn_temp2)
             
             # Calculate the severity of each event based on the previous system
             cn_locations$severity_score = 0
@@ -211,6 +264,9 @@ server <- function(input, output, session){
             coordinates(cn_locations) <- ~longitude+latitude
             proj4string(cn_locations) <- proj4string(tw_geo)
             
+            # remove the variables that we don't need
+            rm(cn_temp, cn_scoreLength, cn_scoreCivilians, cn_scoreUnknown, cn_scoreTotal, cn_temp2)
+            
             cn_locations
         
         } else {
@@ -221,32 +277,33 @@ server <- function(input, output, session){
     })
     
     # update KPI1
-    kpi1data <- reactive ({
+    kpi1data <- reactive({
         
-        return(
+        if (!is.null(input$region)) {parameter_region = input$region}
+        
             list(
                 
-                lights_score = mean(nl_changes[nl_changes$region == input$region, 6], na.rm=TRUE),
+                lights_score = mean(nl_changes[nl_changes$region == parameter_region, 6], na.rm=TRUE),
                 lights_level = case_when(
-                    lights_score < -0.3 ~ "Plummeted",
+                    lights_score < -0.30 ~ "Plummeted",
                     lights_score < -0.05 ~ "Decreased",
                     lights_score < 0.05 ~ "Similar",
-                    lights_score < 0.3 ~ "Increased",
+                    lights_score < 0.30 ~ "Increased",
                     TRUE ~ "Rocketed"
                 )
                 
             )
-        )
-        
+
     })
     
     # update KPI2
     kpi2data <- reactive ({
         
-        return(
+        if (!is.null(input$region)) {parameter_region = input$region}
+        
             list(
                 
-                severity_score = mean(cn_events[cn_events$region == input$region, 30], na.rm=TRUE),
+                severity_score = mean(cn_events[cn_events$region == parameter_region, 30], na.rm=TRUE),
                 severity_level = case_when(
                     severity_score < 20 ~ "Low",
                     severity_score < 50 ~ "Medium",
@@ -254,55 +311,125 @@ server <- function(input, output, session){
                 )
                 
             )
-        )
         
     })
     
     # regional borders
     st_data <- reactive({
         
-        st_geo[st_geo@data$NAME_1==input$region,]
+        rg_geo[rg_geo@data$NAME_1==input$region,]
         
     })
     
-    # events information
+    # events information for the exploration plot
     events_data <- reactive({
         
-        events_data = cn_events[cn_events$region==input$region,]
-        events_data = events_data[events_data$date_start >= parameter_startDate,]
-        events_data = as.data.frame(events_data)
-        events_data
+        # filter the events by region, type of conflict and conflict name
+        if (input$conflict == "All conflicts in the region") {
+            
+            if (input$type == "All" ) {
+                
+                cn_temp = cn_events[cn_events$region==input$region,]
+                
+            } else {
+                
+                cn_temp = cn_events[cn_events$type_of_violence==input$type &
+                                        cn_events$region==input$region,]
+            }
+            
+            # filter by the events where we have nightlights information
+            cn_temp = cn_temp[cn_temp$date_start > "2012-04-01",]
+            
+            # update start and end dates
+            parameter_startDate = as.Date(min(cn_temp[,20]))
+            if (parameter_startDate < as.Date("2012-04-01")) { parameter_startDate = as.Date("2012-04-01") }
+            parameter_endDate = as.Date(max(cn_temp[,21]))
+            
+        } else {
+            
+            if (input$type == "All") {
+                
+                cn_temp = cn_events[cn_events$region==input$region &
+                                        cn_events$conflict_name==input$conflict,]
+            }
+            
+            else {
+                
+                cn_temp = cn_events[cn_events$type_of_violence==input$type &
+                                        cn_events$region==input$region &
+                                        cn_events$conflict_name==input$conflict,]
+            }
+            
+            # filter by the events where we have nightlights information
+            cn_temp = cn_temp[cn_temp$date_start > "2012-04-01",]
+            
+            # update start and end dates
+            parameter_startDate = as.Date(min(cn_temp[,20]))
+            if (parameter_startDate < as.Date("2012-04-01")) { parameter_startDate = as.Date("2012-04-01") }
+            parameter_endDate = as.Date(max(cn_temp[,21]))
+            
+        }
+        
+        # Filter by precision of the events
+        if (input$precision[1] == "Low" & input$precision[2] == "Low") {
+            
+            cn_temp = cn_temp %>% filter(precision_level == "Low")
+            
+        } else {
+            
+            
+            if (input$precision[1] == "Medium" & input$precision[2] == "Medium") {
+                
+                cn_temp = cn_temp %>% filter(precision_level == "Medium")
+                
+            } else {
+                
+                
+                if (input$precision[1] == "High" & input$precision[2] == "High") {
+                    
+                    cn_temp = cn_temp %>% filter(precision_level == "High")
+                    
+                } else {
+                    
+                    
+                    if (input$precision[1] == "Low" & input$precision[2] == "Medium") {
+                        
+                        cn_temp = cn_temp %>% filter(precision_level == "Low" |
+                                                         precision_level == "Medium")
+                        
+                    } else {
+                        
+                        
+                        if (input$precision[1] == "Medium" & input$precision[2] == "High") {
+                            
+                            cn_temp = cn_temp %>% filter(precision_level == "Medium" |
+                                                             precision_level == "High")
+                        }}}}}
+        
+        # we always pick the events from 2012
+        #cn_temp = cn_temp[cn_temp$date_start >= parameter_startDate,]
+        
+        # prepare the dataframe to deliver
+        cn_temp = as.data.frame(cn_temp)
+        
+        # deliver
+        cn_temp
         
     })
     
     # night lights information
     nl_dataChanges <- reactive({
         
-        # We update the changes of conflicts when selected, if not, it shows for all the regions
-        if (input$conflict != "All conflicts in the region") {
-
-            parameter_startDate = as.Date(min(cn_conflicts[cn_conflicts$conflict_name==input$conflict, 5]))
-            parameter_endDate = as.Date(max(cn_conflicts[cn_conflicts$conflict_name==input$conflict, 6]))
-            
-        } else {
-            
-            parameter_startDate = as.Date(min(cn_conflicts[cn_conflicts$region==input$region, 5]))
-            parameter_endDate = as.Date(max(cn_conflicts[cn_conflicts$region==input$region, 6]))
-
-        }
-        
-        if (parameter_startDate < "2012-04-01") {parameter_startDate=as.Date("2012-04-01")}
-        
         # select the first day of each month
-        parameter_startDate = as.Date(cut(parameter_startDate, "month"))
-        parameter_endDate = as.Date(cut(parameter_endDate, "month"))
+        start = as.Date(cut(parameter_startDate, "month"))
+        end = as.Date(cut(parameter_endDate, "month"))
         
         # Changes are normalized by year (like we do with  %  of interest of money):
         # the readings change will be divided by the years between the first and last date
-        parameter_length <- as.numeric(difftime(parameter_endDate, parameter_startDate, unit="weeks"))/52.25
+        parameter_length <- as.numeric(difftime(end, start, unit="weeks"))/52.25
         
         nl_changes = nl_data[which(nl_data$region==input$region),]
-        nl_changes = nl_changes[(nl_changes$date==parameter_startDate | nl_changes$date==parameter_endDate),]
+        nl_changes = nl_changes[(nl_changes$date==start | nl_changes$date==end),]
         nl_changes = cast(nl_changes, region+district+township~date, mean, value="radiance")
         names(nl_changes) = c("region", "district", "township", "first", "last")
         
@@ -329,16 +456,6 @@ server <- function(input, output, session){
         
     })
     
-    # locations information
-
-    
-    # prediction information
-    md_data <- reactive ({
-        
-        md_df_results[md_df_results$region == input$region,]
-        
-    })
-    
     # population changes information
     pp_data <- reactive ({
         
@@ -350,9 +467,17 @@ server <- function(input, output, session){
     
     # draw the base map
     output$map <- renderTmap(
+
         
         if (!rlang::is_empty(locations_data())) {
-            tm <- tm_shape(st_data()) +
+            tm <- 
+                # base map
+                # https://leaflet-extras.github.io/leaflet-providers/preview/
+                tm_basemap(server=leaflet::providers$Stamen.Toner, 
+                           alpha=0.15) +
+                
+                # region borders
+                tm_shape(st_data()) +
                 tm_borders(col="black", 
                            lwd=2,
                            alpha = 1) +
@@ -362,12 +487,12 @@ server <- function(input, output, session){
                 # nightlights layer
                 tm_shape(nl_dataChanges()) + 
                 tm_fill(col="light_level",
-                        breaks = changesBreaks,
-                        labels = names(changesPalette),
-                        palette = changesPalette,
+                        breaks = lightsBreaks,
+                        labels = names(lightsPalette),
+                        palette = lightsPalette,
                         legend.show = FALSE,
                         zindex = 402) +
-                tm_borders(col = "black", 
+                tm_borders(col = "grey", 
                            lwd = 1, 
                            lty="dotted",
                            alpha = 0.5,
@@ -387,7 +512,7 @@ server <- function(input, output, session){
                            alpha = 0.7,
                            palette=severityPalette,
                            size="n_events",
-                           border.col="grey",
+                           border.col="white",
                            border.lwd=1,
                            scale = 1,
                            zindex = 404,
@@ -403,14 +528,14 @@ server <- function(input, output, session){
                 
                 tm_view(control.position=c("right","bottom"),
                         view.legend.position=c("left","bottom"))
-            
-            tmap_mode("view")
-            
             tm
-            
+                      
         } else {
             
-            tm_shape(st_data()) +
+            tm <- 
+                
+                # regional shape
+                tm_shape(st_data()) +
                 tm_borders(col="black", 
                            lwd=2,
                            alpha = 1) +
@@ -419,13 +544,14 @@ server <- function(input, output, session){
                 
                 
                 # nightlights layer
+                tm_shape(nl_dataChanges()) + 
                 tm_fill(col="light_level",
-                        breaks = changesBreaks,
-                        labels = names(changesPalette),
-                        palette = changesPalette,
-                        legend.show = TRUE,
+                        breaks = lightsBreaks,
+                        labels = names(lightsPalette),
+                        palette = lightsPalette,
+                        legend.show = FALSE,
                         zindex = 402) +
-                tm_borders(col = "black", 
+                tm_borders(col = "grey", 
                            lwd = 1, 
                            lty="dotted",
                            alpha = 0.5,
@@ -435,61 +561,30 @@ server <- function(input, output, session){
                               labels = c("Rocketed", "Increased", "Similar", "Decreased", "Plummeted"),
                               reverse = TRUE,
                               border.col = "grey40",
-                              title="Lights Levels   ",
-                              z=1) +
+                              title="Lights Levels ..",
+                              z=1,
+                              zindex = 401) +
                 
+                # general options
                 tm_view(control.position=c("right","bottom"),
                         view.legend.position=c("left","bottom"))
-            
-            tmap_mode("view")
             
             tm
             
         }
-
         
     )
-    
-    # update regional border
-    observe({
-        
-        if (!rlang::is_empty(st_data())) {
-            
-            draw_region_map("map", st_data(), session)
-        }
-    })
-
-    # update nightlights information layer
-    observe({
-        
-        if (!rlang::is_empty(nl_dataChanges())) {
-           
-            draw_nl_layer("map", nl_dataChanges(), session)
-        }
-    })
-    
-    # update locations information layer
-    observe({
-        
-        # this gaves an error with cn_locations
-        #if (!rlang::is_empty(locations_data())) {
-        #    
-        #    draw_events_layer("map", location_data(), session)
-        #
-        #}
-    })
     
     ### Explore Output ---------------------------------------------------------
 
     # KPI-1
     output$KPI1 <- renderValueBox({
 
-        .tmp1 <- kpi1data()
-        w <- .tmp1$lights_level
-        x <- .tmp1$lights_score
+        level <- kpi1data()$lights_level
+        score <- kpi1data()$lights_score
 
-        valueBox(tags$p(paste0(w," lights"), style = "font-size: 40%;"), 
-                 subtitle=tags$p(paste0(round(x*100), "% of difference"), style="font-size: 70%;"),
+        valueBox(tags$p(paste0(level," lights"), style = "font-size: 40%;"), 
+                 subtitle=tags$p(paste0(round(score*100), "% of difference"), style="font-size: 70%;"),
                  icon = icon("sun"), 
                  color="aqua")
     })
@@ -497,65 +592,64 @@ server <- function(input, output, session){
     # KPI-2
     output$KPI2 <- renderValueBox({
         
-        .tmp2 <- kpi2data()
-        y <- .tmp2$severity_level
-        z <- .tmp2$severity_score
+        level <- kpi2data()$severity_level
+        score <- kpi2data()$severity_score
         
-        valueBox(tags$p(paste0(y," severity"), style = "font-size: 40%;"), 
-                 subtitle=tags$p(paste0("Scored ", round(z), " over 100"), style="font-size: 70%;"),
+        valueBox(tags$p(paste0(level," severity"), style = "font-size: 40%;"), 
+                 subtitle=tags$p(paste0("Scored ", round(score), " over 100"), style="font-size: 70%;"),
                  icon = icon("skull-crossbones"),
-                 color="orange",
-                 width=4)
+                 color="orange")
     })
     
     # Explore plot
     explore_plot <- reactive({
         
-        p <- ggplot(data=events_data(), 
-                    aes(x=date_start, y=severity_score, colour=severity_level)) +
-            geom_point(size=4, 
-                       stroke=0,
-                       shape=16,
-                       alpha=0.3) +
-            geom_smooth(method = "lm", alpha=0.2, aes(fill = severity_level)) +
-            theme(
-                legend.position = "none",
-                plot.background = element_blank(),
-                panel.background = element_rect(fill = "#FFFFFF"),
-                panel.border = element_blank(),
-                panel.grid = element_blank(),
-                panel.grid.major = element_blank(),
-                panel.grid.minor = element_blank(),
-                panel.grid.major.x = element_line(size = 0.5, 
-                                                  linetype = 'dotted',
-                                                  colour = "grey"), 
-                panel.grid.major.y = element_line(size = 0.5, 
-                                                  linetype = 'dotted',
-                                                  colour = "grey"), 
-                panel.grid.minor.x = element_blank(),
-                panel.grid.minor.y = element_blank(),
-                axis.title.y=element_text(size=10, 
-                                          colour="dark grey",
-                                          margin = margin(t = 0, r = 10, b = 0, l = 0)),
-                axis.text.y=element_text(size=8, colour="dark grey"),
-                axis.ticks.y=element_blank(),
-                axis.title.x=element_blank(),
-                axis.text.x=element_text(size=8, colour="dark grey"),
-                axis.ticks.x=element_blank(),
-                axis.ticks = element_blank()
-            ) +
-            ylab("severity score") +
-            ylim(c(0, NA)) +
-            scale_y_continuous(breaks = integer_breaks()) +
-            scale_x_date(limits = as.Date(c(parameter_startDate, parameter_endDate)) 
-        )
+            type <- input$type
+                
+            p <- ggplot(data=events_data(), 
+                        aes(x=date_start, y=severity_score, colour=severity_level)) +
+                geom_point(size=4, 
+                           stroke=0,
+                           shape=16,
+                           alpha=0.3) +
+                geom_smooth(method = "lm", 
+                            formula = y ~ x,
+                            alpha=0.2, 
+                            aes(fill = severity_level)) +
+                theme(
+                    legend.position = "none",
+                    plot.background = element_blank(),
+                    panel.background = element_rect(fill = "#FFFFFF"),
+                    panel.border = element_blank(),
+                    panel.grid = element_blank(),
+                    panel.grid.major = element_blank(),
+                    panel.grid.minor = element_blank(),
+                    panel.grid.major.x = element_line(size = 0.5, 
+                                                      linetype = 'dotted',
+                                                      colour = "grey"), 
+                    panel.grid.major.y = element_line(size = 0.5, 
+                                                      linetype = 'dotted',
+                                                      colour = "grey"), 
+                    panel.grid.minor.x = element_blank(),
+                    panel.grid.minor.y = element_blank(),
+                    axis.title.y=element_text(size=10, 
+                                              colour="dark grey",
+                                              margin = margin(t = 0, r = 10, b = 0, l = 0)),
+                    axis.text.y=element_text(size=8, colour="dark grey"),
+                    axis.ticks.y=element_blank(),
+                    axis.title.x=element_blank(),
+                    axis.text.x=element_text(size=8, colour="dark grey"),
+                    axis.ticks.x=element_blank(),
+                    axis.ticks = element_blank()
+                ) +
+                ylab("severity score") +
+                ylim(c(0, NA)) +
+                scale_y_continuous(limits = c(0,100), breaks = seq(0, 100, by = 20)) +
+                scale_x_date(limits = as.Date(c("2012-01-01", "2019-12-01")))
+                
+                p + severityScale
             
-            p + severityScale
-            
-        # update KPI1
-        
-        # update KPI2
-        
+
     })
     
     # Plot
@@ -564,21 +658,52 @@ server <- function(input, output, session){
         # check if there are events in the selected region
         if (is.data.frame(events_data()) && nrow(events_data())==0) {
             # if not, draw and empty plot
-            plot.new()
+            ggplot() +
+                ylab("severity score") +
+                scale_y_continuous(limits = c(0,100), breaks = seq(0, 100, by = 20)) +
+                scale_x_date(limits = as.Date(c("2012-01-01", "2019-12-01"))) +
+                theme(legend.position = "none",
+                      plot.background = element_blank(),
+                      panel.background = element_rect(fill = "#FFFFFF"),
+                      panel.border = element_blank(),
+                      panel.grid = element_blank(),
+                      panel.grid.major = element_blank(),
+                      panel.grid.minor = element_blank(),
+                      panel.grid.major.x = element_line(size = 0.5, 
+                                                        linetype = 'dotted',
+                                                        colour = "grey"), 
+                      panel.grid.major.y = element_line(size = 0.5, 
+                                                        linetype = 'dotted',
+                                                        colour = "grey"), 
+                      panel.grid.minor.x = element_blank(),
+                      panel.grid.minor.y = element_blank(),
+                      axis.title.y=element_text(size=10, 
+                                                colour="dark grey",
+                                                margin = margin(t = 0, r = 10, b = 0, l = 0)),
+                      axis.text.y=element_text(size=8, colour="dark grey"),
+                      axis.ticks.y=element_blank(),
+                      axis.title.x=element_blank(),
+                      axis.text.x=element_text(size=8, colour="dark grey"),
+                      axis.ticks.x=element_blank(),
+                      axis.ticks = element_blank()
+                ) 
+            
         } else {
+            
             explore_plot()
+            
         }
         
     }, bg="transparent")
 
     ### Predict Output ---------------------------------------------------------
     
-    output$prediction_plot <- renderPlotly({
+    output$prediction_plot <- renderPlot({
         
 
         p <- ggplot(pp_data(), aes(month, township, fill=light_level)) +
             geom_tile(color="grey", size=0.1) + 
-            scale_fill_manual(values=changesPalette, na.value="white") +
+            scale_fill_manual(values=lightsPalette, na.value="white") +
             facet_grid(.~year)
         
         p <- p + theme(
@@ -589,21 +714,25 @@ server <- function(input, output, session){
             plot.title=element_blank(),
             strip.background = element_blank(),
             legend.position = "none",
-            axis.title.y=element_text(size=7, colour="dark grey"),
+            axis.title.y=element_text(size=10, 
+                                      colour="dark grey",
+                                      margin = margin(t = 0, r = 10, b = 0, l = 0)),
             axis.text.y=element_blank(),
             axis.ticks.y=element_blank(),
             axis.title.x=element_blank(),
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank(),
             axis.text=element_blank(),
-            strip.text.x = element_text(size=6, colour="dark grey", angle=90),
+            strip.text.x = element_text(size=8, colour="dark grey", angle=90)
         ) +
             xlab("") + 
+            ylab("townships") +
             removeGrid()
         
-        ggplotly(p) 
+        p 
         
     })
+
     
     ### Township Click Event ---------------------------------------------------
 

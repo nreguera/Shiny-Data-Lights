@@ -39,6 +39,7 @@ h2{
 	font-weight: bold;
 	color: #000;
 	position: absolute;
+	text-shadow: 1px 1px #ffffff;
 	margin-top: 2%;	
 	right: 2%;
 	z-index: 998;
@@ -49,6 +50,7 @@ h1{
 	font-weight: bold;
 	color: #000;
 	position: absolute;
+	text-shadow: 1px 1px #ffffff;
 	margin-top: 5%;	
 	right: 2%;
 	z-index: 998;
@@ -84,6 +86,8 @@ h6 {
 .navbar-default {
 	background-color: #FFFFFF !important;
 	border-color: #E7E7E7 !important;
+	border-bottom: 0px;
+	box-shadow: 0 4px 6px -6px #222;
 }
   
 .navbar-brand {
@@ -158,7 +162,7 @@ h6 {
 
 .irs-slider.to {
 	background: #B9B9B9; 
-	border: #B9B9B9; 
+	border: #E9E9E9; 
 }
 
 /* NOTIFICATIONS */
@@ -174,7 +178,6 @@ h6 {
 }
 
 /* MAP */
-
 #map{
 	border-radius: 10px !important;
 	position: absolute;
@@ -186,7 +189,8 @@ h6 {
 	content: '';
 	height: 100%;
 	width: 100%;
-	z-index: 100;
+	z-index: 997;
+	box-shadow: 0 2px 4px -3px #222;
 }
 
 /* EXPLORE */
