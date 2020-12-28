@@ -109,7 +109,7 @@ ui <- shinyUI(fluidPage(
         top = "auto", left = "0%", bottom = "4.5%",
         width = "16%", height = "6%",
        
-        "App in development (v.23),",
+        "App in development (v.24),",
         br(),
         "some features may not be available"
 
@@ -127,7 +127,7 @@ ui <- shinyUI(fluidPage(
         tmapOutput("map", width = "100%", height = "100%"),
         
 
-        h2("Changes in nightlights in the locations with events"),
+        h2("Changes in nightlights in the conflicts clusters"),
         h1(textOutput("dateRange"))
 
         # Click township button
@@ -222,17 +222,27 @@ ui <- shinyUI(fluidPage(
                
                ), # background panel
              
-      # Text
+      # Project Text
       absolutePanel(
        
-       id = "project", class = "panel panel-default", 
-       fixed = TRUE, draggable = FALSE, 
-       top = "11%", left = "22%", bottom = "auto",
-       width = "50%", height = "85%",
-       
-       includeMarkdown("Project.Rmd"),
-       br()
-       
+        id = "project", class = "panel panel-default", 
+        fixed = TRUE, draggable = FALSE, 
+        top = "11%", left = "22%", bottom = "auto",
+        width = "50%", height = "85%",
+        
+        h3("Exploring the drivers of migration through the nightlights lens"),
+        br(),
+        br(),
+        "The main goal of this project is to provide users with tools to explore information linked to migration on development, ",
+        "supporting them in understanding the current situation, and allowing them to estimate past (where data doesn't exist) ",
+        "and future changes, that would help to take action to improve the impact of migration in the Lower Mekong Region.",
+        br(),
+        br(),
+        "To achieve this, the app will use only open data sources, having the nightlights data as base to find correlations ",
+        "with other sources of data that are of interest.",
+        "The domains that will be observed to explore the drivers of migartion are conflicts, economic forces, ",
+        "climate change and humanitarian disasters.",
+        
       ), # absolute panel - Text
       
       # info
@@ -246,14 +256,17 @@ ui <- shinyUI(fluidPage(
         h5("About us"),
         br(),
         br(),
-        "If you have any suggestion or question about the app, please send us an email and we will try to get you ",
-        "back as soon as possible.",
+        "If you have any suggestion or question about the app, or want to include any kind of information or answer a question, ",
+        "drop us a message, we will be glad to help you as soon as possible.",
         br(),
         br(),
         br(),
-        a(actionButton(inputId = "email1", label = "Contact Us", 
-                       icon = icon("envelope", lib = "font-awesome")),
-          href="mailto:my_awesome_email_address.com")
+        a(actionButton(inputId = "b_email", 
+                       label = "Contact Us", 
+                       icon = icon("refresh"),
+                       class = "btn btn-standard"),
+                       href="mailto:natxo.reguera@gmail.com",
+                       target="_blank")
         
       ) # absolute panel - Info
 
@@ -269,49 +282,67 @@ ui <- shinyUI(fluidPage(
        top = "11%", left = "1%", bottom = "auto",
        width = "18%", height = "80%",
        
-       h5("How to interpret the data?"),
+       h5("How to read the data?"),
        br(),
        br(),
        
-       "We have created a metric to value the severity of the events based on the length of the events, ",
-       "and the numbers of civilians, unknown and total, giving a bit more important to the civilians.",
-       "For each levels of severity, we have set a score range to clasify the events based on their score.",
+       "A metric values the severity of the events based on the length of the events, ",
+       "and the number of deats (civilians, unknown and total), giving special relevence to civilians deaths.",
+       "Each event has a score that is used to clasify the event in a severity level.",
        br(),       
        br(),
-       "For the accuracy of the events we have done something similar, calculating a metric that scores the ",
-       "accuracy of each event based on the location and dates precision, the number of sources, and ",
-       "the clarity of the event, giving a score and clasifying them into a predefined level of accuracy.",
+       "Another metric values the accuracy of the events based on the location precision and the date precision, ",
+       "on the number of sources, and on the clarity of the event. From this data, each event receives a score ",
+       "and then is clasified into a level of accuracy.",
        br(),       
        br(),
-       "The nightlights represent the radiance measured in nanoWatts/cm2/sr. The changes has been classified ",
-       "in 5 group with breaks at 30% and 5% both negatives and positives.",
+       "The nightlights data represents radiance readings measured in nanoWatts/cm2. ",
+       "Based on these readings, it has been calculated the changes and annualized them to make them comparable. ",
+       "Then these changes has been classified in 5 group depending on the difference with the previous period, ",
+       "setting breaks at 30% and 5%, at both negatives and positives sides.",
        br(),       
        br(),
-       "For the map there are basically two layers: one showing the yearly radiances changes for a period, ",
-       "counted from the start of the conflicts in the selected region, or from the start of the conflict in ",
-       "the selected conflict; anohter showing the location and severity of the events based on the previous classification.",
+       "The map shows two layers of information: the first with the radiances changes (counting from the start of the conflicts ",
+       "in the selected region, or from the start of the conflict if user has selected a conflict);",
+       "the second with the location where events happened and its severity.",
        br(),       
        br(),
-       "For the exploration plot it is shown the events classified by its level of severity, and the trend ",
-       "over the time.",
+       "In the right side, the two top boxes show the level of changes and severity for the selected region, as an average of ",
+       "it's townships. Below them, a plot shows all the events for the seleceted region/conflict, classified by its level ",
+       "of severity and with its trend over the time.",
        br(),       
        br(),
-       "Finally, the prediction plot shows the predicted changes in population for each township in the selected region",
+       "In the right bottom the plot shows the estimated changes in population for each township in the selected region",
        "classified based on the previous nightlights changes levels.",
        
        ),
       
-      # Text
+      # Data Text
       absolutePanel(
        
-       id = "data", class = "panel panel-default", 
-       fixed = TRUE, draggable = FALSE, 
-       top = "11%", left = "22%", bottom = "auto",
-       width = "50%", height = "85%",
-       
-       includeMarkdown("Data.Rmd"),
-       br()
-       
+          id = "data", class = "panel panel-default", 
+          fixed = TRUE, draggable = FALSE, 
+          top = "11%", left = "22%", bottom = "auto",
+          width = "50%", height = "85%",
+          
+          h3("Only Open Data"),
+          br(),
+          br(),
+          "The app is using mainly Remote Sensing data together with manually produced and collected data.",
+          "Specifically the app is going to ingest the following sources of data:",
+          br(),
+          br(),
+          h5("DMSP data collected by US Air Force Weather Agency Image and data processing by NOAA's National Geophysical Data Center"),
+          h6(a("[link]", href="https://www.ngdc.noaa.gov/eog/download.html")),
+          h5("VIIRS data produced by Earth Observation Group, Payne Institute for Public Policy"),
+          h6(a("[link]", href="https://eogdata.mines.edu/download_dnb_composites.html")),
+          h5("UCDP Georeferenced Event dataset, collected by the Department of Peace and Conflict Research, Uppsala University"),
+          h6(a("[link]", href="https://ucdp.uu.se/")),
+          h5("Geographical Administrative Divisions v3.6, produced and distributed by GADM"),
+          h6(a("[link]", href="https://gadm.org/")),
+          h5("Myanmar Census data, produced and distributed by Myanmar Information Managament Unit"),
+          h6(a("[link]", href="http://themimu.info/")),
+                 
       ), # absolute panel - Text
       
       # info
@@ -325,35 +356,38 @@ ui <- shinyUI(fluidPage(
         h5("How data is ingested in the app?"),
         br(),
         br(),
-        "For the integration of conflicts data in the app it has been used a RESTful API that automatically ",
-        "connects with the UDP server and downloads it. If you want to updated it now, just click the button below.",
+        "For the acquisition of conflicts data it has been used a RESTful API that connects with ",
+        "UCDP server and downloads it. This process will be automatically executed monthly, but If you want to ",
+        "update it now, just click the button below.",
         br(),
         br(),
         br(),
-        actionButton("button", "Update conflict data", size="xs", style = "material-flat"),
+        actionButton("b_conflict", 
+                     "Update conflict data", 
+                     class = "btn btn-standard"),
         br(),
         br(),
         br(),
-        "For the nightlights data there is set up a manual process that acquires the data and ingest into the app, ",
-        "as it involves more processing time and resources that are not currently available in the server where this app is ",
-        "deployed. It will be updated in a monthly basis.", 
+        "For the nightlights data, it has been set up a manual process that acquires the data, process it, and ingest into ",
+        "the app, as it involves images processing that cost time and resources not currently available in the server where ",
+        "this app is deployed. This process will be carried in a monthly basis.",
         br(),
         br(),
-        "Population data is manually downloaded and included in the app as well, when a collection by ",
-        "the corresponding government office is made.",
+        "Population data is manually acquired and included in the app as well. This process will be carried when ",
+        "the corresponding government office collects and makes available this data.",
         hr(),
         "A note about the nightlights data: ",
-        "the data currently available have some noise coming from moonlight, fires, and other natural sources of light",
-        ", making sometimes difficult to get accurate data. NASA’s Goddard Space Flight Center is developing new software to make ",
-        "this data clearer and accurate.",
+        "currently there is some noise coming from moonlight, fires, and other natural sources of light",
+        ", making sometimes difficult to get accurate data. NASA’s Goddard Space Flight Center is developing ",
+        "new software to make this data clearer and accurate. Once these improvements are available, we will ",
+        "incude them in our models.",
         br(),
         br(),
         "A note about the predictions: ",
-        "it has been implemented two types of models in the app: ",
-        "regression and classification. Regression models are trained with conflicts data, with population data (of ",
-        "which there is only one period), and with nightlights data (that as it has been already explained ",
-        "it lacks of enough accuracy. For these reasons, the estimations calculated in this app must be taken ",
-        "as preliminary 'drafts' until more quality data is available.",
+        "models are trained with conflicts, population and nightlights data. ",
+        "Some of these data lack of accuracy or completeness, that may affect to the performance of the models. ",
+        "For this reason, the estimations calculated must be taken as preliminary 'drafts' ",
+        "until more quality data is available to re-train and improve the models.",
         
       ) # absolute panel - info
 

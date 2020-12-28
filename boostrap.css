@@ -22,17 +22,27 @@
 
 }
 
-/* Text paragraphs */
+/* Text style */
  hr {
 	border-top: 1px solid #E1E1E1;
 	margin-bottom: 10% !important;
 	margin-top: 10% !important;
 }
 
-h1{
-
+hrnew1 {
+  border-top: 1px solid red;
 }
 
+h1{
+	font-size:12px;
+	font-weight: bold;
+	color: #000;
+	position: absolute;
+	text-shadow: 1px 1px #ffffff;
+	margin-top: 5%;	
+	right: 2%;
+	z-index: 998;
+}
 
 h2{
 	font-size:14px;
@@ -45,15 +55,9 @@ h2{
 	z-index: 998;
 }
 
-h1{
-	font-size:12px;
-	font-weight: bold;
-	color: #000;
-	position: absolute;
-	text-shadow: 1px 1px #ffffff;
-	margin-top: 5%;	
-	right: 2%;
-	z-index: 998;
+h3{
+	font-size:24px;
+
 }
 
 h4 {
@@ -190,7 +194,7 @@ h6 {
 	height: 100%;
 	width: 100%;
 	z-index: 997;
-	box-shadow: 0 2px 4px -3px #222;
+	/*box-shadow: 4px 4px 4px -4px #222;  offset-x | offset-y | blur-radius | spread-radius | color */
 }
 
 /* EXPLORE */
@@ -260,7 +264,8 @@ h6 {
 	border-radius: 8px !important;
 	text-align: center !important;
 	padding: 5% !important;
-	background-color: #FAFAFA;
+	background-color: rgba(226,226,226,1);
+	box-shadow: 4px 4px 4px -4px #222; /* offset-x | offset-y | blur-radius | spread-radius | color */
 }
 
 /* DATA */
@@ -278,7 +283,8 @@ h6 {
 	border-radius: 8px !important;
 	text-align: center !important;
 	padding: 5% !important;
-	background-color: #FAFAFA;
+	background-color: rgba(226,226,226,1);
+	box-shadow: 4px 4px 4px -4px #222; /* offset-x | offset-y | blur-radius | spread-radius | color */
 }
 
 #data_info {
@@ -288,4 +294,31 @@ h6 {
 	background-color: #FAFAFA;
 	border-width: 2px;
 	border-color: #000000;
+}
+
+/* BUTTONS */
+.btn-standard {
+  display: block;
+  padding: 0px;
+  margin: 0px;
+  height: 4%;
+  width: 100%;
+  border-radius: 6px !important;
+  background-color: rgba(226,226,226,1) !important;
+  font-size: 12px;
+  border: 1px solid #000000 !important;
+  transition-duration: 0.4s;
+}
+
+.btn-standard:hover {
+  display: block;
+  padding: 0px;
+  margin: 0px;
+  height: 4%;
+  width: 100%;
+  border-radius: 6px !important;
+  background-color: #000000 !important;
+  color: #ffffff;
+  font-size: 12px;
+  border: 1px solid #000000 !important;
 }

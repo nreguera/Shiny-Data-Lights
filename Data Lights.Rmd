@@ -28,7 +28,7 @@ rm(list = ls())
 file = paste0(dirname(getwd()), "/myEnvironment.RData", sep="")
 load(file)
 
-# remove the vatiables that we don´t want
+# remove the variables that we don´t want
 rm(file)
 
 ```
@@ -63,6 +63,8 @@ library(tidyr)
 # Model data
 library(DAAG)
 library(mclust)
+library(fpc)
+library(dbscan)
 
 # Performance
 library(shinyloadtest)
@@ -1098,18 +1100,29 @@ proj4string(cn_locations_detail) <- proj4string(tw_geo)
 # https://www.freecodecamp.org/news/8-clustering-algorithms-in-machine-learning-that-all-data-scientists-should-know/
 # https://en.proft.me/2017/02/1/model-based-clustering-r/
   
-# Prepare de dataset for clustering
-loc = cn_events[cn_events$region==parameter_region,c(16,17,31)]
-loc$severity_level= as.character(loc$severity_level)
-loc$severity_level[loc$severity_level == "High"] <- "3"
-loc$severity_level[loc$severity_level == "Medium"] <- "2"
-loc$severity_level[loc$severity_level == "Low"] <- "1"
-loc$severity_level = as.numeric(loc$severity_level)
+# Prepare de dataset for clustering (only with longitude and latitude)
+cn_temp = cn_events[cn_events$region==parameter_region, c(16,17,31)]
+cn_temp$severity_level= as.character(cn_temp$severity_level)
+cn_temp$severity_level[cn_temp$severity_level == "High"] <- "3"
+cn_temp$severity_level[cn_temp$severity_level == "Medium"] <- "2"
+cn_temp$severity_level[cn_temp$severity_level == "Low"] <- "1"
+cn_temp$severity_level = as.numeric(cn_temp$severity_level)
 
-l = loc[,-c(3)]
+# select variables to have into account for clustering
+# for clustering we must use only numerical variables
+# add conflict id to cluster based on conflicts
+cn_temp = cn_temp[,-c(3)]
 
-# Perform model-based clustering (only over numerical variables) 
-md_mbc = Mclust(l)
+
+
+```
+
+
+```{r MOD}
+# Create location clusters based on distance
+# Perform model-based clustering 
+
+md_mbc = Mclust(cn_clusters)
 
 # Check results
 md_mbc$modelName # optimal selected model
@@ -1122,13 +1135,81 @@ plot(md_mbc, what=c("classification"))
 plot(md_mbc, "density")
 
 # cluster observations distribution
-table(loc$severity_level, md_mbc$classification) # amount of the data within each cluster
-data.frame(l,cluster=md_mbc$classification) # clusters assigned to each location
+table(cn_temp$severity_level, md_mbc$classification)
+
+# Attach the clusters assigned to each location
+cn_clusters = data.frame(cn_temp, cluster=md_mbc$classification)
 
 # We will leave for future plot this clusters over the map as now is difficult and computing costly
 
+# Remove the variables that we don't need anymore
+#rm(cn_temp)
 
 
+```
+
+
+```{r MOD}
+# Create location clusters based on distance
+# DBS Scan
+
+#http://www.sthda.com/english/wiki/wiki.php?id_contents=7940
+# https://towardsdatascience.com/explaining-dbscan-clustering-18eaf5c83b31
+
+# Compute DBSCAN using fpc package
+set.seed(123)
+
+md_db <- dbscan(cn_temp, eps=0.4, MinPts=3)
+
+# Attach the clusters assigned to each location
+cn_clusters = data.frame(cn_temp, cluster=md_db$cluster)
+
+# Plot DBSCAN results
+plot(md_db, cn_temp, main = "DBSCAN", frame = FALSE)
+
+# Distribution of points in the clusters
+# Cluster 0 correspond to outliers
+table(md_db$cluster)
+
+# Remove the variables that we don't need anymore
+#rm(cn_temp)
+
+
+```
+
+
+```{r MOD}
+# Create location clusters based on distance and impact
+# Hierarchical clustering
+
+# Prepare de dataset for clustering (only with longitude and latitude)
+cn_temp = cn_events[cn_events$region==parameter_region, c(16,17,31)]
+d=40000  # Distance threshold         
+
+
+xy <- SpatialPointsDataFrame(matrix(c(cn_temp$longitude, cn_temp$latitude), ncol=2), data.frame(ID=seq(1:length(cn_temp$longitude))),
+                               proj4string=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))
+
+xy <- spTransform(xy, CRS("+init=epsg:27700 +datum=WGS84"))
+
+chc <- hclust(dist(data.frame(rownames=rownames(xy@data), x=coordinates(xy)[,1],
+              y=coordinates(xy)[,2])), method="complete")
+
+# Distance with a 40m threshold  
+chc.d40 <- cutree(chc, h=d) 
+
+# Join results to meuse sp points
+xy@data <- data.frame(xy@data, Clust=chc.d40)
+
+# Plot results
+plot(xy, col=factor(xy@data$Clust), pch=19)
+     box(col="black")
+       title(main="Clustering")
+        legend("topleft", legend=paste("Cluster", 1:4,sep=""),
+                   col=palette()[1:4], pch=rep(19,4), bg="white")
+
+
+table(xy@data$Clust)
 
 ```
 
@@ -1822,6 +1903,9 @@ saveRDS(rg_geo, file=file)
 
 file = "E:/Data Lights/Shiny/tw_geo.rds"
 saveRDS(tw_geo, file=file)
+
+file = "E:/Data Lights/Shiny/rg_clusters.rda"
+save(rg_clusters, file=file)
 
 # Save dataframes
 file = "E:/Data Lights/Shiny/nl_data.rda"

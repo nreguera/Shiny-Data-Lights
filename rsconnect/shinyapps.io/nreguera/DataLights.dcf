@@ -5,8 +5,8 @@ account: nreguera
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3262737
-bundleId: 4024826
+bundleId: 4034222
 url: https://nreguera.shinyapps.io/DataLights/
-when: 1608789867.18815
+when: 1609131557.78276
 asMultiple: FALSE
 asStatic: FALSE
