@@ -417,6 +417,14 @@ server <- function(input, output, session){
         
     })
 
+    # UPDATE CLUSTERS INFORMATION
+    clusters_data <- reactive ({
+        
+        rg_clusters <- rg_clusters[rg_clusters$region==input$region,]
+        sf::st_crs(rg_clusters) <- CRS.string
+        rg_clusters
+    })
+    
     # UPDATE KPI1 INFORMATION
     kpi1data <- reactive({
         
@@ -470,7 +478,7 @@ server <- function(input, output, session){
     
     # draw the base map
     output$map <- renderTmap(
-
+        
         
         if (!rlang::is_empty(locations_data())) {
             tm <- 
@@ -481,64 +489,64 @@ server <- function(input, output, session){
                 
                 # region borders
                 tm_shape(st_data()) +
-                    tm_borders(col="black", 
-                               lwd=2,
-                               alpha = 1) +
+                tm_borders(col="black", 
+                           lwd=2,
+                           alpha = 1) +
                 
                 # add township layer to show additional information
                 
                 # nightlights layer
                 tm_shape(nl_dataChanges()) + 
-                    tm_fill(col="light_level",
-                            breaks = lightsBreaks,
-                            labels = names(lightsPalette),
-                            palette = lightsPalette,
-                            legend.show = FALSE,
-                            zindex = 402) +
-                    tm_borders(col = "grey", 
-                               lwd = 1, 
-                               lty="dotted",
-                               alpha = 0.5,
-                               zindex = 403) +
-                    tm_add_legend('fill', 
-                                  col = c("#00dfff","#D6EFF6","#F2F3EC","#fdfce1","#fbf79b"),
-                                  labels = c("Rocketed", "Increased", "Similar", "Decreased", "Plummeted"),
-                                  reverse = TRUE,
-                                  border.col = "grey40",
-                                  title="Lights Levels       ..",
-                                  z=1,
-                                  zindex = 401) +
+                tm_fill(col="light_level",
+                        breaks = lightsBreaks,
+                        labels = names(lightsPalette),
+                        palette = lightsPalette,
+                        legend.show = FALSE,
+                        zindex = 402) +
+                tm_borders(col = "grey", 
+                           lwd = 1, 
+                           lty="dotted",
+                           alpha = 0.5,
+                           zindex = 403) +
+                tm_add_legend('fill', 
+                              col = c("#00dfff","#D6EFF6","#F2F3EC","#fdfce1","#fbf79b"),
+                              labels = c("Rocketed", "Increased", "Similar", "Decreased", "Plummeted"),
+                              reverse = TRUE,
+                              border.col = "grey40",
+                              title="Lights Levels       ..",
+                              z=1,
+                              zindex = 401) +
                 
                 # locations layer
                 tm_shape(locations_data()) +
-                    tm_dots(col="severity_level",
-                               alpha = 0.7,
-                               palette=severityPalette,
-                               size=0.05,
-                               border.col="white",
-                               border.lwd=2,
-                               zindex = 404,
-                               legend.show = FALSE) +
-                    tm_add_legend('fill', 
-                                  col = c("#FF0000","#FF8C00","#C0C0C0"),
-                                  border.col = "grey40",
-                                  labels = c('High','Medium','Low'),
-                                  title="Severity Levels",
-                                  z=2,
-                                  zindex = 402) +
+                tm_dots(col="severity_level",
+                        alpha = 0.7,
+                        palette=severityPalette,
+                        size=0.05,
+                        border.col="white",
+                        border.lwd=2,
+                        zindex = 404,
+                        legend.show = FALSE) +
+                tm_add_legend('fill', 
+                              col = c("#FF0000","#FF8C00","#C0C0C0"),
+                              border.col = "grey40",
+                              labels = c('High','Medium','Low'),
+                              title="Severity Levels",
+                              z=2,
+                              zindex = 402) +
                 
                 # clusters layer
                 # for the color try to do it with an if (severity) loop and a proxy
                 # that will plot the border based on the severity (maybe the parameter if the function?)
-                tm_shape(rg_clusters) + 
-                    tm_borders(col="grey",
-                               lty="dashed",
-                               lwd=2) +
+                tm_shape(clusters_data()) + 
+                tm_borders(col="grey",
+                           lty="dashed",
+                           lwd=2) +
                 
                 tm_view(control.position=c("right","bottom"),
                         view.legend.position=c("left","bottom"))
             tm
-                      
+            
         } else {
             
             tm <- 
@@ -582,8 +590,7 @@ server <- function(input, output, session){
             
         }
         
-    )
-    
+    )    
     ### Explore Output ---------------------------------------------------------
 
     # KPI-1

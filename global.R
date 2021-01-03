@@ -14,6 +14,7 @@ library(lubridate)
 library(ggExtra)
 library(tidyr)
 library(reshape)
+library(sf)
 
 # Exploration
 library(tmap)
@@ -34,6 +35,8 @@ library(shinyWidgets)
 rg_geo <- readRDS("rg_geo.rds")
 #rg_geo <- readRDS("rg_clusters.rds")
 tw_geo <- readRDS("tw_geo.rds")
+
+CRS.string=proj4string(tw_geo)
 
 # load dataframes
 load(file="cn_conflicts.rda")
@@ -80,6 +83,7 @@ severity_level <- case_when(
   severity_score < 50 ~ "Medium",
   TRUE ~ "High")
 
+
 ### Functions to display correct UI options ------------------------------------
 
 
@@ -89,7 +93,39 @@ severity_level <- case_when(
 
 ### Functions for the map ------------------------------------------------------
 
-tmap_mode("view")
+#tmap_mode("view")
+
+# region shape
+draw_base_map <- function(region, townships) {
+
+  # region borders
+  tm_shape(region) +
+    tm_borders(col="black",
+             lwd=2,
+             alpha = 1,
+             zindex=401) #+
+    
+  # nl layer
+  #tm_shape(townships) + 
+  #  tm_borders(col="red", zindex = 401)
+  
+}
+
+
+# nightlights layer
+update_nl_layer <- function(map, session, nlData) {
+
+  tmapProxy(map, session, {
+    
+    tm_remove_layer(401) +
+      
+    tm_shape(nlData) + 
+      tm_fill(col="green", zindex = 401)
+
+
+  })
+  
+}
 
 ### Functions for the exploration plot -----------------------------------------
 

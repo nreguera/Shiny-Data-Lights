@@ -109,7 +109,7 @@ ui <- shinyUI(fluidPage(
         top = "auto", left = "0%", bottom = "4.5%",
         width = "16%", height = "6%",
        
-        "App in development (v.24),",
+        "App in development (v.25),",
         br(),
         "some features may not be available"
 
@@ -386,12 +386,15 @@ ui <- shinyUI(fluidPage(
         "A note about the predictions: ",
         "models are trained with conflicts, population and nightlights data. ",
         "Some of these data lack of accuracy or completeness, that may affect to the performance of the models. ",
-        "For this reason, the estimations calculated must be taken as preliminary 'drafts' ",
+        "For this reason, the estimations calculated must be taken as preliminary ",
         "until more quality data is available to re-train and improve the models.",
         
       ) # absolute panel - info
 
     ) # tabPanel - Data
+    
+    # Help button
+
 
   ) # navbarPage
 ))

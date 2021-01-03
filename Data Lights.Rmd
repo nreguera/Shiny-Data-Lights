@@ -40,6 +40,8 @@ rm(file)
 # Load data
 library(readxl)
 library(Rnightlights)
+library(httr)
+library(jsonlite)
 
 # Process data
 library(sp)
@@ -143,6 +145,8 @@ parameter_region = "Kachin"
 ```{r LDA}
 # Load geographical data
 
+# The coordinate reference system is longitude/latitude and the WGS84 datum
+
 # Region/State level
 file <- paste(dir_data, "geo/gadm36_MMR_1_sp.rds", sep="")
 rg_geo <- readRDS(file)
@@ -162,10 +166,39 @@ rm(file)
 
 
 ```{r PRP}
+# Simplify the polygons in the map layers
+
+# Region/state level
+rg_geo = ms_simplify(rg_geo, keep = 0.05)
+
+plot(rg_geo[rg_geo@data$NAME_1=="Rakhine",])
+plot(rg_geo_simplified[rg_geo_simplified@data$NAME_1=="Rakhine",])
+
+# Township level
+
+# Data and polygons have different row.names
+row.names(tw_geo@data)[1:10]
+sapply(tw_geo@polygons, slot, "ID")[1:10]
+
+# So first we need to make data slot's row.names match those of the polygons
+row.names(tw_geo@data) <- row.names(tw_geo)
+
+# And then we can simplify
+tw_geo = ms_simplify(tw_geo, keep = 0.05)
+
+plot(tw_geo[tw_geo@data$NAME_1=="Shan",])
+plot(tw_geo_simplified[tw_geo_simplified@data$NAME_1=="Shan",])
+
+
+```
+
+
+```{r PRP}
 # Create new dataframes from the geographical data
 
 # create a list of regions and states
 rg_list = as.data.frame(rg_geo@data$NAME_1)
+names(rg_list) <- "region"
 
 # There are 2 townships with the same name in the same Region, so we will use for the Maubin region
 # township the name that appears in the VARNAME_3 column: "Danuphyu".
@@ -174,19 +207,8 @@ tw_geo@data$NAME_3[tw_geo@data$NAME_2=="Maubin" & tw_geo@data$NAME_3=="Danubyu"]
 # create a list of regions and townships
 tw_list = tw_geo@data[,c(4,7,10)]
 tw_list <- cbind(id=rownames(tw_list), tw_list)
+names(tw_list) <- c("id", "region", "district", "township")                 
 
-
-```
-
-
-```{r PRP}
-# Simplify the polygons in the map layers
-
-# Region/state level
-#rg_geo = ms_simplify(rg_geo, keep = 0.1)
-
-# Township level
-#tw_geo = ms_simplify(tw_geo, keep = 0.1)
 
 ```
 
@@ -524,8 +546,7 @@ rm(i)
 
 
 ```{r EDA, eval=FALSE}
-# Check distributions
-
+# Check distributions of events
 
 # histogram
 ggplot(cn_events, aes(x=deaths_civilians)) + 
@@ -769,9 +790,9 @@ rm(region, district, township, cn_temp)
 ```
 
 
-```{r EDA}
-
+```{r EDA, eval=FALSE}
 # plot those that fall in a specific state
+
 filter <- cn_events[ which(cn_events$region=="Kachin"), ]
 
 {plot(st_geo, col = 'lightgrey', border = 'darkgrey')
@@ -781,9 +802,9 @@ points(filter$longitude, filter$latitude, col="red", cex=1)}
 ```
 
 
-```{r EDA}
-
+```{r EDA, eval=FALSE}
 # events by type and state
+
 cn_temp = cn_events[c("year", "type_of_violence", "NAME_1")]
 cn_temp = cn_temp %>% count(type_of_violence, NAME_1)
 
@@ -795,7 +816,6 @@ ggplot(cn_temp, aes(x=n, fill=type_of_violence, color=type_of_violence)) +
 
 
 ```
-
 
 
 ```{r PRP}
@@ -1023,7 +1043,6 @@ proj4string(cn_locations) <- proj4string(tw_geo)
 ```
 
 
-
 ```{r PRP}
 # Classify locations detail by its severity
 
@@ -1077,17 +1096,12 @@ for (i in 1:nrow(cn_locations_detail)) {
 # Convert severity_level in an ordered factor
 cn_locations_detail$severity_level = factor(cn_locations_detail$severity_level, ordered = TRUE)
 
-# Remove the variables that we don´t need anymore
-rm(i, cn_scoreLength, cn_scoreCivilians, cn_scoreUnknown, cn_scoreTotal)
-
-```
-
-
-
-```{r PRP}
 # convert location detail coordinates to spatial object
 coordinates(cn_locations_detail) <- ~longitude+latitude
 proj4string(cn_locations_detail) <- proj4string(tw_geo)
+
+# Remove the variables that we don´t need anymore
+rm(i, cn_scoreLength, cn_scoreCivilians, cn_scoreUnknown, cn_scoreTotal)
 
 ```
 
@@ -1100,19 +1114,9 @@ proj4string(cn_locations_detail) <- proj4string(tw_geo)
 # https://www.freecodecamp.org/news/8-clustering-algorithms-in-machine-learning-that-all-data-scientists-should-know/
 # https://en.proft.me/2017/02/1/model-based-clustering-r/
   
-# Prepare de dataset for clustering (only with longitude and latitude)
-cn_temp = cn_events[cn_events$region==parameter_region, c(16,17,31)]
-cn_temp$severity_level= as.character(cn_temp$severity_level)
-cn_temp$severity_level[cn_temp$severity_level == "High"] <- "3"
-cn_temp$severity_level[cn_temp$severity_level == "Medium"] <- "2"
-cn_temp$severity_level[cn_temp$severity_level == "Low"] <- "1"
-cn_temp$severity_level = as.numeric(cn_temp$severity_level)
-
-# select variables to have into account for clustering
-# for clustering we must use only numerical variables
-# add conflict id to cluster based on conflicts
-cn_temp = cn_temp[,-c(3)]
-
+# it would be interesting to cluster by location and similarity/weight, like
+# severity score or conflict id to cluster based on conflicts
+# Now we will cluster only based on longitude and latitude, and by region
 
 
 ```
@@ -1120,7 +1124,10 @@ cn_temp = cn_temp[,-c(3)]
 
 ```{r MOD}
 # Create location clusters based on distance
-# Perform model-based clustering 
+# Model-based clustering 
+
+# Prepare de dataset for clustering (longitude, latitude and severity_score)
+cn_clusters = cn_events[cn_events$region==parameter_region, c(16,17,30)]
 
 md_mbc = Mclust(cn_clusters)
 
@@ -1140,76 +1147,185 @@ table(cn_temp$severity_level, md_mbc$classification)
 # Attach the clusters assigned to each location
 cn_clusters = data.frame(cn_temp, cluster=md_mbc$classification)
 
-# We will leave for future plot this clusters over the map as now is difficult and computing costly
-
-# Remove the variables that we don't need anymore
-#rm(cn_temp)
-
 
 ```
 
 
 ```{r MOD}
 # Create location clusters based on distance
-# DBS Scan
+# DBS Scan Model
 
-#http://www.sthda.com/english/wiki/wiki.php?id_contents=7940
+# http://www.sthda.com/english/wiki/wiki.php?id_contents=7940
 # https://towardsdatascience.com/explaining-dbscan-clustering-18eaf5c83b31
 
-# Compute DBSCAN using fpc package
+# select numerical variables to have into account for clustering
+
 set.seed(123)
+cn_clusters <- data.frame(latitude=numeric(),
+                            longitude=numeric(),
+                            cluster=numeric(),
+                            region=character(),
+                            stringsAsFactors=FALSE)
 
-md_db <- dbscan(cn_temp, eps=0.4, MinPts=3)
+for (i in 1:nrow(rg_list)) {
 
-# Attach the clusters assigned to each location
-cn_clusters = data.frame(cn_temp, cluster=md_db$cluster)
+  # check that there are events in the region
+  if (nrow(cn_events[cn_events$region==rg_list[i,1],]) > 0) {
+    
+    cn_temp = cn_events[cn_events$region==rg_list[i,1], c(16,17)]
+    md_dbs = dbscan(cn_temp, eps=0.4, minPts=3)
+
+    cn_temp_clusters = data.frame(cn_temp, cluster=md_dbs$cluster) # cluster
+    cn_temp_clusters$region = rg_list[i,1] # region
+    cn_temp_clusters$severity_score = cn_events[cn_events$region==rg_list[i,1], 30] # severity_score
+    cn_clusters = rbind(cn_clusters, cn_temp_clusters) # add the cluster+region+severity
+
+  } else {next}
+  
+}
 
 # Plot DBSCAN results
-plot(md_db, cn_temp, main = "DBSCAN", frame = FALSE)
+plot(md_dbs, cn_temp_clusters, main = "DBSCAN", frame = FALSE)
 
-# Distribution of points in the clusters
-# Cluster 0 correspond to outliers
-table(md_db$cluster)
+# Distribution of points in the clusters (Cluster 0 correspond to outliers)
+table(md_dbs$cluster)
 
 # Remove the variables that we don't need anymore
-#rm(cn_temp)
+rm(cn_temp, cn_temp_clusters, i)
 
 
 ```
 
 
-```{r MOD}
-# Create location clusters based on distance and impact
-# Hierarchical clustering
+```{r PRP}
+# Add aditional information to each cluster
 
-# Prepare de dataset for clustering (only with longitude and latitude)
-cn_temp = cn_events[cn_events$region==parameter_region, c(16,17,31)]
-d=40000  # Distance threshold         
+# Severity score of each cluster
+cn_clusters <- cn_clusters %>%
+  dplyr::group_by(cluster) %>%
+  dplyr::mutate(cluster_severity=round(mean(severity_score))) %>%
+  as.data.frame()
 
+# add the severity level
 
-xy <- SpatialPointsDataFrame(matrix(c(cn_temp$longitude, cn_temp$latitude), ncol=2), data.frame(ID=seq(1:length(cn_temp$longitude))),
-                               proj4string=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))
-
-xy <- spTransform(xy, CRS("+init=epsg:27700 +datum=WGS84"))
-
-chc <- hclust(dist(data.frame(rownames=rownames(xy@data), x=coordinates(xy)[,1],
-              y=coordinates(xy)[,2])), method="complete")
-
-# Distance with a 40m threshold  
-chc.d40 <- cutree(chc, h=d) 
-
-# Join results to meuse sp points
-xy@data <- data.frame(xy@data, Clust=chc.d40)
-
-# Plot results
-plot(xy, col=factor(xy@data$Clust), pch=19)
-     box(col="black")
-       title(main="Clustering")
-        legend("topleft", legend=paste("Cluster", 1:4,sep=""),
-                   col=palette()[1:4], pch=rep(19,4), bg="white")
+```
 
 
-table(xy@data$Clust)
+```{r PRP, eval=FALSE}
+# Create spatial object to store the clusters polygons by region
+# with this code you can use spatial objects
+
+# initialize the sp dataframe where to store the clusters polygons
+rg_temp <- SpatialPolygonsDataFrame(SpatialPolygons(list()), data=data.frame())
+
+# turn coordinates into a new polygon
+new_polygon <- coordinates %>%
+  Polygon() %>%
+  list() %>%
+  Polygons(ID=j*i) %>%
+  list() %>%
+  SpatialPolygons(proj4string = CRS(proj4string(tw_geo)))
+
+# assign correct (polygon) ID to the dataframe
+#pid <- sapply(slot(new_polygon, "polygons"), function(x) slot(x, "ID")) 
+#row.names(cluster_data) = pid
+
+# convert the spatial polygon to spatial polygon dataframe 
+polygon_df <- SpatialPolygonsDataFrame(new_polygon, data=cluster_data)
+
+# add the polygon to the region spatial object
+rg_temp <- rbind(rg_temp, polygon_df, makeUniqueIDs = TRUE)
+
+```
+
+
+```{r PRP}
+# Create spatial object to store the clusters polygons by region
+# https://bookdown.org/nicohahn/making_maps_with_r5/docs/leaflet.html
+# https://r-spatial.github.io/sf/articles/sf1.html
+
+# initialize the sp dataframe where to store the clusters polygons with the geometry column
+rg_clusters <- st_sf(st_sfc(), crs = CRS(proj4string(tw_geo)))
+
+# for each region, create polygons and a dataframe (with severity score, level...)
+for (i in 1:nrow(rg_list)) {
+  
+  # initialize sf variable
+  rg_temp <- st_sf(st_sfc(), crs = CRS(proj4string(tw_geo)))
+  
+  # select the clusters in the region
+  cn_temp <- cn_clusters[cn_clusters$region == rg_list[i,1],]
+  
+  # loop only in those regions that have clusters
+  if (nrow(cn_temp[!(cn_temp$cluster==0),])>0) {
+    
+    # remove those coordinates that aren't in a cluster (cluster=0)
+    cn_temp <- cn_temp[!(cn_temp$cluster==0),]
+    
+    # keep only the coordinates and cluster data in each cluster
+    cn_temp_2 <- cn_temp[,c(1,2,3)]
+  
+    # split the points by cluster (we convert dataframe into a list of dataframes)
+    cn_temp_3 <- split(cn_temp_2, cn_temp_2$cluster)
+  
+    # remove cluster from each list element and keep only the coordinates
+    cn_temp_coordinates <- lapply(cn_temp_3, function(x) x[-3])
+    
+    # compute which points lie on the convex hull (outer points) of each cluster
+    # this function returns the index of the point that we will keep, not the coordinates
+    cn_temp_chull <- lapply(cn_temp_coordinates, chull)
+      
+    # keep only those points on the convex hull to draw a polygon across them
+    # with this function we get the coordinates from the previous chull index
+    cn_temp_outer <- lapply(seq_len(length(cn_temp_chull)), function(x, ...) {
+      cn_temp_coordinates[[x]][cn_temp_chull[[x]],]
+    })
+    
+    # create the polygons for the selected clusters in the region
+    for (j in 1:length(cn_temp_outer)) {
+      
+      # select the outer coordinates of each cluster
+      coordinates <- cn_temp_outer[[j]]
+      
+      # check if there are more than 2 coordinates to make a polygon
+      if (nrow(coordinates)>2) {
+        
+        # copy the first point to the end of the dataframe to "close" the polygon
+        coordinates <- rbind(coordinates, coordinates[1,])
+        
+        # turn these coordinates into a polygon
+        polygon <- coordinates %>%
+          st_as_sf(coords = c("longitude", "latitude"), crs = CRS(proj4string(tw_geo))) %>%
+          summarise(geometry = st_combine(geometry)) %>%
+          st_cast("POLYGON")
+        
+        # Add the data to the polygon and convert it to spatial dataframe
+        # strategy: as we only have the coordinates and 1 coordinate belongs to only 1 polygon,
+        # we will find the first pair of coordinates that match with the polygons
+        cluster_data = cn_temp[match(unique(paste0(cn_temp$longitude,cn_temp$latitude)),
+                                     paste0(coordinates$longitude,coordinates$latitude)[1]),
+                               c(3,4,6)]
+        cluster_data = cluster_data[complete.cases(cluster_data),]
+
+        # add the attributes to the polygon
+        polygon_df <- st_sf(data.frame(polygon, cluster_data))
+        
+        # bind the polygons together
+        rg_temp <- rbind(rg_temp, polygon_df)
+        
+      } else {next}
+    }
+  
+    # Add the polygons of the region/state to the sfc
+    rg_clusters <- rbind(rg_clusters, rg_temp)
+
+  } else {next}
+}
+
+# Remove the variables that we don't need anymore
+remove(cn_temp, cn_temp_coordinates, cn_temp_chull, cn_temp_outer, 
+       rg_temp, coordinates, i, j,
+       cn_temp_2, cn_temp_3)
 
 ```
 
@@ -1247,53 +1363,6 @@ ggplot(cn_explore) +
   ) +
   xlab("") +
   ylab("")
-
-
-```
-
-
-```{r PRP}
-# Create a dataset with monthly deaths by region from the conflict dataset
-
-# Split the months from the conflicts dataset (in the new columns start_dates and end_dates)
-cn_events_monthly <- cn_events %>%
-  mutate(test = map2(date_start, date_end, expand_dates)) %>%
-  unnest(cols = c(test))
-
-# Add a column with the month
-cn_events_monthly$month = month(cn_events_monthly$start_dates)
-
-
-```
-
-
-```{r EDA}
-# Plotting monthly conflicts by state
-
-# Select a state
-cn_explore = cn_events_monthly[ which(cn_events_monthly$NAME_1==parameter_region),]
-
-# Line graph
-ggplot(cn_explore, aes(start_dates, deaths_total)) + geom_line() + scale_x_date(date_labels = "%b-%Y") +
-geom_vline(xintercept = as.Date("01-01-2018",  format = "%d-%m-%Y"), linetype = 'dotted', color = 'blue')
-
-# Select the data we need to  draw the map
-cn_explore = cn_explore[c("id","longitude","latitude","deaths_total","severity")]
-# transform the data to spatial coordinates
-coordinates(cn_explore) <- ~longitude+latitude
-
-st_layer = st_geo[st_geo@data$NAME_1==parameter_region,]
-tw_layer = tw_geo[tw_geo@data$NAME_1==parameter_region,]
-
-# Map of the selected state with the total_deaths as bubbles
-tm_shape(st_layer) +
-    tm_borders(col="black", lwd=1) +
-tm_shape(tw_layer) +
-    tm_borders(col="grey", lwd=1, lty="dashed", alpha=0.6) +
-tm_shape(cn_explore) +
-    tm_bubbles(size="deaths_total", col="severity") + 
-tm_legend(show=TRUE) +
-tm_layout(frame=FALSE)
 
 
 ```
